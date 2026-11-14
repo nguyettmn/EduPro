@@ -1,0 +1,241 @@
+// In-memory demo store: React context + reducer.
+// No backend: everything resets when the page reloads, and "reset demo"
+// restores the seed data exactly.
+import { createContext, useContext, useMemo, useReducer } from 'react';
+import type { ReactNode } from 'react';
+import type {
+  Account,
+  Assignment,
+  ChatMsg,
+  GameDef,
+  Lesson,
+  Proposal,
+  RepoItem,
+  StudentAnswer,
+  Submission,
+  TutorData,
+} from '../types';
+import {
+  ACCOUNTS,
+  ASSIGNMENTS,
+  CLASSES,
+  LESSON_COPIES,
+  PACK,
+  PACK_LESSONS,
+  PROPOSALS,
+  REPO_ITEMS,
+  SCHOOLS,
+  SUBMISSIONS,
+  TEAMS,
+  TUTOR_DATA,
+} from '../data/seed';
+
+export interface AppState {
+  currentAccountId: string | null;
+  accounts: Account[];
+  lessons: Lesson[];
+  assignments: Assignment[];
+  submissions: Submission[];
+  proposals: Proposal[];
+  repoItems: RepoItem[];
+  tutor: Record<string, TutorData>;
+  /** Admin school filter (null = all schools). */
+  schoolFilter: string | null;
+}
+
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+export function buildInitialState(): AppState {
+  return {
+    currentAccountId: null,
+    accounts: clone(ACCOUNTS),
+    lessons: clone([...PACK_LESSONS, ...LESSON_COPIES]),
+    assignments: clone(ASSIGNMENTS),
+    submissions: clone(SUBMISSIONS),
+    proposals: clone(PROPOSALS),
+    repoItems: clone(REPO_ITEMS),
+    tutor: clone(TUTOR_DATA),
+    schoolFilter: null,
+  };
+}
+
+export type Action =
+  | { type: 'SWITCH_ACCOUNT'; accountId: string }
+  | { type: 'LOGOUT' }
+  | { type: 'SUBMIT_WORK'; submission: Submission }
+  | { type: 'ADD_COMMENT'; submissionId: string; comment: string }
+  | { type: 'MARK_REVIEWED'; submissionId: string }
+  | { type: 'PROPOSE'; proposal: Proposal }
+  | { type: 'REVIEW_PROPOSAL'; proposalId: string; decision: 'approved' | 'rejected'; reason: string; decidedBy: string; repoItem?: RepoItem; nextStage?: Proposal['stage'] }
+  | { type: 'CREATE_ASSIGNMENT'; assignment: Assignment }
+  | { type: 'COPY_TO_MY_SPACE'; lesson: Lesson }
+  | { type: 'CREATE_STUDENT'; account: Account; tutor: TutorData }
+  | { type: 'ADD_REVIEW_QUESTION'; studentId: string; questionId: string }
+  | { type: 'MARK_MASTERED'; studentId: string; questionId: string }
+  | { type: 'ADD_CHAT'; studentId: string; message: ChatMsg }
+  | { type: 'SAVE_GAME'; studentId: string; game: GameDef }
+  | { type: 'RECORD_GAME_SCORE'; studentId: string; gameId: string; score: number }
+  | { type: 'UPDATE_LESSON_COPY'; lesson: Lesson }
+  | { type: 'CREATE_LESSON_COPY'; lesson: Lesson }
+  | { type: 'DELETE_LESSON_COPY'; lessonId: string }
+  | { type: 'SET_SCHOOL_FILTER'; schoolId: string | null }
+  | { type: 'RESET_DEMO' };
+
+export function reducer(state: AppState, action: Action): AppState {
+  switch (action.type) {
+    case 'SWITCH_ACCOUNT':
+      return { ...state, currentAccountId: action.accountId };
+    case 'LOGOUT':
+      return { ...state, currentAccountId: null };
+    case 'SUBMIT_WORK': {
+      const existing = state.submissions.findIndex(
+        (s) => s.assignmentId === action.submission.assignmentId && s.studentId === action.submission.studentId,
+      );
+      const submissions = [...state.submissions];
+      if (existing >= 0) submissions[existing] = action.submission;
+      else submissions.push(action.submission);
+      return { ...state, submissions };
+    }
+    case 'ADD_COMMENT':
+      return {
+        ...state,
+        submissions: state.submissions.map((s) =>
+          s.id === action.submissionId ? { ...s, comment: action.comment } : s,
+        ),
+      };
+    case 'MARK_REVIEWED':
+      return {
+        ...state,
+        submissions: state.submissions.map((s) =>
+          s.id === action.submissionId ? { ...s, reviewed: true } : s,
+        ),
+      };
+    case 'PROPOSE':
+      return { ...state, proposals: [...state.proposals, action.proposal] };
+    case 'REVIEW_PROPOSAL': {
+      const nextStage: Proposal['stage'] = action.nextStage ?? 'done';
+      const proposals = state.proposals.map((p): Proposal => {
+        if (p.id !== action.proposalId) return p;
+        if (action.decision === 'rejected') {
+          return { ...p, status: 'rejected', reason: action.reason, decidedBy: action.decidedBy };
+        }
+        if (nextStage === 'done') {
+          return { ...p, status: 'approved', stage: 'done', decidedBy: action.decidedBy };
+        }
+        return { ...p, stage: nextStage, decidedBy: action.decidedBy };
+      });
+      const repoItems = action.repoItem ? [...state.repoItems, action.repoItem] : state.repoItems;
+      return { ...state, proposals, repoItems };
+    }
+    case 'CREATE_ASSIGNMENT':
+      return { ...state, assignments: [...state.assignments, action.assignment] };
+    case 'COPY_TO_MY_SPACE':
+      return { ...state, lessons: [...state.lessons, action.lesson] };
+    case 'CREATE_STUDENT':
+      return {
+        ...state,
+        accounts: [...state.accounts, action.account],
+        tutor: { ...state.tutor, [action.account.id]: action.tutor },
+      };
+    case 'ADD_REVIEW_QUESTION': {
+      const t = state.tutor[action.studentId];
+      if (!t || t.reviewQuestionIds.includes(action.questionId)) return state;
+      return {
+        ...state,
+        tutor: { ...state.tutor, [action.studentId]: { ...t, reviewQuestionIds: [...t.reviewQuestionIds, action.questionId] } },
+      };
+    }
+    case 'MARK_MASTERED': {
+      const t = state.tutor[action.studentId];
+      if (!t) return state;
+      return {
+        ...state,
+        tutor: {
+          ...state.tutor,
+          [action.studentId]: {
+            ...t,
+            reviewQuestionIds: t.reviewQuestionIds.filter((id) => id !== action.questionId),
+            masteredIds: t.masteredIds.includes(action.questionId) ? t.masteredIds : [...t.masteredIds, action.questionId],
+          },
+        },
+      };
+    }
+    case 'ADD_CHAT': {
+      const t = state.tutor[action.studentId];
+      if (!t) return state;
+      return {
+        ...state,
+        tutor: { ...state.tutor, [action.studentId]: { ...t, chat: [...t.chat, action.message] } },
+      };
+    }
+    case 'SAVE_GAME': {
+      const t = state.tutor[action.studentId];
+      if (!t) return state;
+      return {
+        ...state,
+        tutor: { ...state.tutor, [action.studentId]: { ...t, selfGames: [...t.selfGames, action.game] } },
+      };
+    }
+    case 'RECORD_GAME_SCORE': {
+      const t = state.tutor[action.studentId];
+      if (!t) return state;
+      const prev = t.bestScores[action.gameId] ?? 0;
+      return {
+        ...state,
+        tutor: {
+          ...state.tutor,
+          [action.studentId]: {
+            ...t,
+            bestScores: { ...t.bestScores, [action.gameId]: Math.max(prev, action.score) },
+          },
+        },
+      };
+    }
+    case 'UPDATE_LESSON_COPY':
+      return {
+        ...state,
+        lessons: state.lessons.map((l) => (l.id === action.lesson.id ? action.lesson : l)),
+      };
+    case 'CREATE_LESSON_COPY':
+      return { ...state, lessons: [...state.lessons, action.lesson] };
+    case 'DELETE_LESSON_COPY':
+      return { ...state, lessons: state.lessons.filter((l) => l.id !== action.lessonId) };
+    case 'SET_SCHOOL_FILTER':
+      return { ...state, schoolFilter: action.schoolId };
+    case 'RESET_DEMO':
+      return { ...buildInitialState(), currentAccountId: state.currentAccountId };
+    default:
+      return state;
+  }
+}
+
+interface StoreContextValue {
+  state: AppState;
+  dispatch: React.Dispatch<Action>;
+  currentAccount: Account | null;
+}
+
+const StoreContext = createContext<StoreContextValue | null>(null);
+
+export function StoreProvider({ children }: { children: ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, undefined, buildInitialState);
+  const value = useMemo<StoreContextValue>(() => {
+    const currentAccount =
+      state.accounts.find((a) => a.id === state.currentAccountId) ?? null;
+    return { state, dispatch, currentAccount };
+  }, [state]);
+  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+}
+
+export function useStore(): StoreContextValue {
+  const ctx = useContext(StoreContext);
+  if (!ctx) throw new Error('useStore must be used inside StoreProvider');
+  return ctx;
+}
+
+// Static reference data (not part of the mutable demo state).
+export const REFERENCE = { SCHOOLS, TEAMS, CLASSES, PACK };
+
+export type { StudentAnswer };
