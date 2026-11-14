@@ -82,3 +82,57 @@ export function scoreAnswers(
   }
   return { score, total: questions.length };
 }
+
+export interface TopicResult {
+  topicId: string;
+  correct: number;
+  total: number;
+}
+
+/**
+ * Per-topic results for one submission. Only the given questions count;
+ * unanswered questions count as wrong, exactly like scoreAnswers.
+ */
+export function topicResults(
+  questions: Question[],
+  answers: Record<string, StudentAnswer>,
+): TopicResult[] {
+  const byTopic = new Map<string, { correct: number; total: number }>();
+  for (const q of questions) {
+    const entry = byTopic.get(q.topicId) ?? { correct: 0, total: 0 };
+    entry.total += 1;
+    if (checkAnswer(q, answers[q.id] ?? { type: 'empty' as const })) entry.correct += 1;
+    byTopic.set(q.topicId, entry);
+  }
+  return [...byTopic.entries()].map(([topicId, { correct, total }]) => ({
+    topicId,
+    correct,
+    total,
+  }));
+}
+
+/**
+ * Refresh a student's weak-topic list from one new submission.
+ * - A topic answered fully correctly stops being weak.
+ * - A topic with fewer than half correct becomes weak.
+ * - Anything in between leaves the list unchanged, and topics the
+ *   submission did not cover are untouched.
+ * The result follows the pack topic order.
+ */
+export function updateWeakTopics(
+  current: string[],
+  results: TopicResult[],
+  topicOrder: string[],
+): string[] {
+  const next = new Set(current);
+  for (const r of results) {
+    if (r.total === 0) continue;
+    if (r.correct === r.total) next.delete(r.topicId);
+    else if (r.correct * 2 < r.total) next.add(r.topicId);
+  }
+  const ordered = topicOrder.filter((id) => next.has(id));
+  for (const id of next) {
+    if (!topicOrder.includes(id)) ordered.push(id);
+  }
+  return ordered;
+}

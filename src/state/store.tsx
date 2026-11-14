@@ -29,6 +29,8 @@ import {
   TEAMS,
   TUTOR_DATA,
 } from '../data/seed';
+import { QUESTIONS } from '../data/questions';
+import { topicResults, updateWeakTopics } from '../answers';
 
 export interface AppState {
   currentAccountId: string | null;
@@ -96,7 +98,29 @@ export function reducer(state: AppState, action: Action): AppState {
       const submissions = [...state.submissions];
       if (existing >= 0) submissions[existing] = action.submission;
       else submissions.push(action.submission);
-      return { ...state, submissions };
+      // A new submission is fresh evidence about the student's weak topics:
+      // fully correct on a topic clears it, under half correct flags it.
+      const tutorData = state.tutor[action.submission.studentId];
+      if (!tutorData) return { ...state, submissions };
+      const assignment = state.assignments.find((a) => a.id === action.submission.assignmentId);
+      const lesson = assignment
+        ? state.lessons.find((l) => l.id === assignment.lessonId)
+        : undefined;
+      if (!lesson) return { ...state, submissions };
+      const questions = QUESTIONS.filter((q) => lesson.questionIds.includes(q.id));
+      const weakTopics = updateWeakTopics(
+        tutorData.weakTopics,
+        topicResults(questions, action.submission.answers),
+        PACK.topics.map((t) => t.id),
+      );
+      return {
+        ...state,
+        submissions,
+        tutor: {
+          ...state.tutor,
+          [action.submission.studentId]: { ...tutorData, weakTopics },
+        },
+      };
     }
     case 'ADD_COMMENT':
       return {
