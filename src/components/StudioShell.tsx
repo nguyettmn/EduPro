@@ -9,6 +9,8 @@ import { REFERENCE, useStore } from '../state/store';
 import type { Route } from '../route';
 import { MathExpr } from './Fraction';
 import { LessonPlayer } from './LessonPlayer';
+import { HtmlLessonPlayer } from './HtmlLessonPlayer';
+import { AiStudio } from './AiStudio';
 import { EmptyState, SectionBand, TopicTag } from './ui';
 
 const BLANK_SECTION = (id: string): LessonSection => ({
@@ -205,7 +207,7 @@ export function StudioShell({
   go: (route: Route) => void;
 }) {
   const { state, dispatch } = useStore();
-  const [tab, setTab] = useState<'mine' | 'pack' | 'managed'>('mine');
+  const [tab, setTab] = useState<'mine' | 'ai' | 'pack' | 'managed'>('mine');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Lesson | null>(null);
   const [saved, setSaved] = useState(false);
@@ -247,7 +249,7 @@ export function StudioShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeLessonId]);
 
-  const pickTab = (next: 'mine' | 'pack' | 'managed') => {
+  const pickTab = (next: 'mine' | 'ai' | 'pack' | 'managed') => {
     setTab(next);
     setAssignLessonId(null);
     setNotice(null);
@@ -356,6 +358,9 @@ export function StudioShell({
         <button type="button" className={tab === 'mine' ? 'tab tab-active' : 'tab'} onClick={() => pickTab('mine')}>
           Bài của tôi ({myCopies.length})
         </button>
+        <button type="button" className={tab === 'ai' ? 'tab tab-active' : 'tab'} onClick={() => pickTab('ai')}>
+          Soạn bài mới (AI)
+        </button>
         <button type="button" className={tab === 'pack' ? 'tab tab-active' : 'tab'} onClick={() => pickTab('pack')}>
           Pack
         </button>
@@ -386,7 +391,11 @@ export function StudioShell({
                   }}
                 >
                   <strong>{l.title}</strong>
-                  <span className="muted">{l.sections.length} phần</span>
+                  <span className="muted">
+                    {l.html
+                      ? `Bài HTML${l.grade ? ` · Khối ${l.grade}` : ''}${l.subject ? ` · ${l.subject}` : ''}`
+                      : `${l.sections.length} phần`}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -409,6 +418,31 @@ export function StudioShell({
               />
             ) : !draft ? (
               <EmptyState text="Chọn một bài bên trái để sửa, hoặc tạo bài mới." />
+            ) : draft.html ? (
+              <>
+                <p className="guide-text">
+                  Bài HTML do AI soạn — xem trước bên dưới. Muốn sửa nội dung, hãy soạn lại bằng AI;
+                  bản khung này chưa sửa trực tiếp file HTML.
+                </p>
+                <HtmlLessonPlayer html={draft.html} title={draft.title} />
+                <div className="row-actions">
+                  <button type="button" className="btn btn-primary" onClick={() => setAssignLessonId(draft.id)}>
+                    Giao bài
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => {
+                      dispatch({ type: 'DELETE_LESSON_COPY', lessonId: draft.id });
+                      setSelectedId(null);
+                      setDraft(null);
+                      setNotice('Đã xóa bản sao.');
+                    }}
+                  >
+                    Xóa bản sao này
+                  </button>
+                </div>
+              </>
             ) : (
               <>
                 <label className="field">
@@ -509,6 +543,17 @@ export function StudioShell({
         </div>
       ) : null}
 
+      {tab === 'ai' ? (
+        <AiStudio
+          account={account}
+          onSaved={(lessonId) => {
+            setTab('mine');
+            setSelectedId(lessonId);
+            setNotice('Đã lưu bài AI soạn vào Bài của tôi. Bạn có thể giao bài ngay từ đây.');
+          }}
+        />
+      ) : null}
+
       {tab === 'pack' ? (
         assignLesson ? (
           <AssignSheet
@@ -607,7 +652,11 @@ export function StudioShell({
                   </button>
                   {open ? (
                     <div className="repo-item-body">
-                      <LessonPlayer lesson={l} />
+                      {l.html ? (
+                        <HtmlLessonPlayer html={l.html} title={l.title} />
+                      ) : (
+                        <LessonPlayer lesson={l} />
+                      )}
                       <button type="button" className="btn btn-secondary" onClick={() => copyToMine(l)}>
                         Copy về không gian của tôi
                       </button>

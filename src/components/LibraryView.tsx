@@ -6,6 +6,7 @@ import { canDo } from '../permissions';
 import { REFERENCE, useStore } from '../state/store';
 import type { Route } from '../route';
 import { LessonPlayer } from './LessonPlayer';
+import { HtmlLessonPlayer } from './HtmlLessonPlayer';
 import { QuizRunner } from './QuizRunner';
 import { GameView } from './GameView';
 import { EmptyState, TopicTag } from './ui';
@@ -24,6 +25,7 @@ function LessonDetail({
   const { dispatch } = useStore();
   const questions = QUESTIONS.filter((q) => lesson.questionIds.includes(q.id));
   const topics = REFERENCE.PACK.topics.filter((t) => lesson.topicIds.includes(t.id));
+  const isHtml = lesson.html !== undefined && lesson.html !== '';
   const isStudent = canDo(account, 'useTutor');
   const setTab = (next: 'content' | 'practice' | 'game') =>
     go({ view: 'lesson', lessonId: lesson.id, tab: next });
@@ -55,7 +57,15 @@ function LessonDetail({
           {topics.map((t) => (
             <TopicTag key={t.id} topic={t} />
           ))}
-          <span className="muted">{questions.length} câu hỏi</span>
+          {isHtml ? (
+            <span className="muted">
+              Bài HTML tương tác (AI soạn)
+              {lesson.grade ? ` · Khối ${lesson.grade}` : ''}
+              {lesson.subject ? ` · ${lesson.subject}` : ''}
+            </span>
+          ) : (
+            <span className="muted">{questions.length} câu hỏi</span>
+          )}
         </div>
         {canDo(account, 'createContent') && !lesson.ownerId ? (
           <button type="button" className="btn btn-secondary" onClick={copyToMySpace}>
@@ -63,6 +73,10 @@ function LessonDetail({
           </button>
         ) : null}
       </div>
+      {isHtml ? (
+        <HtmlLessonPlayer html={lesson.html!} title={lesson.title} />
+      ) : (
+        <>
       <div className="tabs" role="tablist">
         <button type="button" className={tab === 'content' ? 'tab tab-active' : 'tab'} onClick={() => setTab('content')}>
           Nội dung
@@ -103,6 +117,8 @@ function LessonDetail({
           }}
         />
       ) : null}
+        </>
+      )}
     </div>
   );
 }

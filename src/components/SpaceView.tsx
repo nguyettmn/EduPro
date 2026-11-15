@@ -9,6 +9,7 @@ import { assignmentVisibleToStudent, spaceNameFor } from '../permissions';
 import { REFERENCE, useStore } from '../state/store';
 import type { Route } from '../route';
 import { QuizRunner } from './QuizRunner';
+import { HtmlLessonPlayer } from './HtmlLessonPlayer';
 import { dueLabel, EmptyState, SectionBand, formatDate } from './ui';
 
 const todayIso = (): string => new Date().toISOString().slice(0, 10);
@@ -39,6 +40,27 @@ export function SpaceView({
 
   if (selected) {
     const lesson = state.lessons.find((l) => l.id === selected.lessonId);
+    // HTML lessons carry their own interactive practice inside the file:
+    // the student reads and does it in place. No structured submission
+    // (and no grading) exists for them in the test slice.
+    if (lesson?.html) {
+      return (
+        <div>
+          <button type="button" className="btn btn-ghost" onClick={() => go({ view: 'assignments' })}>
+            ← Quay lại danh sách
+          </button>
+          <SectionBand
+            title={selected.title}
+            guide={`Hạn ${formatDate(selected.dueDate)} (${dueLabel(selected.dueDate)}).`}
+          />
+          <p className="guide-text">
+            Bài HTML tương tác: đọc và làm trực tiếp trong bài. Bản test chưa chấm điểm bài HTML, nên bài này
+            không có nút nộp.
+          </p>
+          <HtmlLessonPlayer html={lesson.html} title={selected.title} />
+        </div>
+      );
+    }
     const questions = QUESTIONS.filter((q) => lesson?.questionIds.includes(q.id));
     const mySubmission = state.submissions.find(
       (s) => s.assignmentId === selected.id && s.studentId === account.id,
@@ -175,6 +197,7 @@ export function SpaceView({
       ) : (
         <div className="todo-list">
           {assignments.map((a) => {
+            const lesson = state.lessons.find((l) => l.id === a.lessonId);
             const mine = state.submissions.find(
               (s) => s.assignmentId === a.id && s.studentId === account.id,
             );
@@ -190,7 +213,11 @@ export function SpaceView({
                   {formatDate(a.dueDate)} ({dueLabel(a.dueDate)})
                 </span>
                 <span className={mine ? 'status-done' : 'status-todo'}>
-                  {mine ? `Đã nộp: ${mine.score} trên ${mine.total}` : 'Chưa làm'}
+                  {lesson?.html
+                    ? 'Bài HTML — mở để xem'
+                    : mine
+                      ? `Đã nộp: ${mine.score} trên ${mine.total}`
+                      : 'Chưa làm'}
                 </span>
               </button>
             );

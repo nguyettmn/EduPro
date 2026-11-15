@@ -1,5 +1,6 @@
-// Shared domain types for EduPro frame v1 (frontend-only demo).
-// No backend, no network: all state is in-memory mock data.
+// Shared domain types for EduPro.
+// Demo state is in-memory (resets on reload). The only network call is
+// POST /api/ai-soan-bai, the server-side Gemini route for AI authoring.
 
 export type Role = 'admin' | 'principal' | 'lead' | 'teacher' | 'student';
 
@@ -126,6 +127,13 @@ export interface Lesson {
   ownerId?: string;
   /** Id of the lesson this copy was made from. */
   sourceId?: string;
+  /** AI-composed single-file HTML lesson (see HtmlLessonPlayer). When set,
+   * the lesson renders from this HTML instead of `sections`, and it has
+   * no structured questions: practice lives inside the HTML itself. */
+  html?: string;
+  /** Grade + subject the lesson was composed for (AI lessons). */
+  grade?: number;
+  subject?: string;
 }
 
 export interface Topic {
