@@ -40,7 +40,12 @@ import {
 import type { AttachmentNote } from '../src/ai/prompt';
 import type { AiRequestBody, WireAttachment } from '../src/ai/apiTypes';
 
-export const config = { maxDuration: 300 };
+// NOTE (diagnosing a persistent 500, 2026-11-15): the maxDuration config
+// export is REMOVED for now. It is the one ingredient shared by every
+// crashing version of this function and absent from the working ping
+// endpoint. If removing it fixes the 500, the duration limit will be
+// restored cautiously (generation needs more than the default).
+// export const config = { maxDuration: 300 };
 
 const DEFAULT_MODEL = 'gemini-3.1-pro-preview';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
