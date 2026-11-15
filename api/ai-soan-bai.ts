@@ -19,11 +19,19 @@
 //   {"type":"done", ...}                 final result (text for propose, html for generate/revise)
 //   {"type":"error","code":"...","message":"..."}  terminal failure
 //
+// HANDLER STYLE: this MUST use the classic Node (req, res) signature.
+// The Web Request/Response signature was tried first and does not work
+// on this project: the trivial ping endpoint hung with 0 bytes and this
+// endpoint returned 500 FUNCTION_INVOCATION_FAILED on every call
+// (observed 2026-11-15), while the Node-style ping returned 200 on the
+// same deployment. Do not convert this file back to the Web signature.
+//
 // Test-slice limits: total attachments <= 4MB decoded (Vercel body limit
 // is 4.5MB); the frontend enforces a smaller cap. Function max duration
 // is 300s (Hobby ceiling); a generation that runs past it is cut off by
 // Vercel and the client reports a timeout.
 import { inflateRawSync } from 'node:zlib';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   buildLessonPrompt,
   buildProposePrompt,
@@ -406,161 +414,196 @@ function extractLeadingComments(html: string): string[] {
     .filter((c) => c !== '');
 }
 
-// ---------- Streaming ----------
+// ---------- Streaming (Node-style handler) ----------
 
 type SseEvent = Record<string, unknown>;
 
-function sseHeaders(): HeadersInit {
-  return {
-    'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no',
-  };
+function sendJson(res: ServerResponse, status: number, code: string, message: string): void {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({ error: code, message }));
 }
 
-function jsonError(status: number, code: string, message: string): Response {
-  return new Response(JSON.stringify({ error: code, message }), {
-    status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-  });
+/** Read the request body. Vercel's Node runtime may pre-parse JSON into
+ * req.body; otherwise the raw stream is still readable. Both paths are
+ * handled so this works either way. */
+async function readRequestBody(req: IncomingMessage): Promise<string> {
+  const preParsed = (req as { body?: unknown }).body;
+  if (typeof preParsed === 'string' && preParsed !== '') return preParsed;
+  if (preParsed !== undefined && preParsed !== null && typeof preParsed === 'object') {
+    return JSON.stringify(preParsed);
+  }
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of req) {
+    const buf = chunk as Buffer;
+    total += buf.length;
+    if (total > 4.5 * 1024 * 1024) {
+      throw new UserError('Yêu cầu quá lớn (tối đa 4MB file đính kèm trong bản test).');
+    }
+    chunks.push(buf);
+  }
+  return Buffer.concat(chunks).toString('utf-8');
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== 'POST') {
-    return jsonError(405, 'method_not_allowed', 'Chỉ hỗ trợ POST.');
+    sendJson(res, 405, 'method_not_allowed', 'Chỉ hỗ trợ POST.');
+    return;
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return jsonError(
+    sendJson(
+      res,
       503,
       'missing_key',
       'Chưa cấu hình GEMINI_API_KEY. Hãy thêm API key của Gemini vào Environment Variables trong Vercel rồi deploy lại.',
     );
+    return;
   }
 
-  const contentLength = Number(req.headers.get('content-length') ?? 0);
+  const contentLength = Number(req.headers['content-length'] ?? 0);
   if (contentLength > 4.5 * 1024 * 1024) {
-    return jsonError(413, 'too_large', 'Yêu cầu quá lớn (tối đa 4MB file đính kèm trong bản test).');
+    sendJson(res, 413, 'too_large', 'Yêu cầu quá lớn (tối đa 4MB file đính kèm trong bản test).');
+    return;
   }
 
   let body: AiRequestBody;
   try {
-    body = (await req.json()) as AiRequestBody;
-  } catch {
-    return jsonError(400, 'bad_json', 'Nội dung gửi lên không phải JSON hợp lệ.');
+    body = JSON.parse(await readRequestBody(req)) as AiRequestBody;
+  } catch (err) {
+    if (err instanceof UserError) {
+      sendJson(res, 413, 'too_large', err.message);
+    } else {
+      sendJson(res, 400, 'bad_json', 'Nội dung gửi lên không phải JSON hợp lệ.');
+    }
+    return;
   }
 
   if (!['propose', 'generate', 'revise'].includes(body.stage)) {
-    return jsonError(400, 'bad_stage', 'Thiếu hoặc sai trường stage.');
+    sendJson(res, 400, 'bad_stage', 'Thiếu hoặc sai trường stage.');
+    return;
   }
   if (!Number.isInteger(body.grade) || body.grade < 1 || body.grade > 12) {
-    return jsonError(400, 'bad_grade', 'Khối phải từ 1 đến 12.');
+    sendJson(res, 400, 'bad_grade', 'Khối phải từ 1 đến 12.');
+    return;
   }
   if (!body.subject || !body.roleSentence) {
-    return jsonError(400, 'bad_input', 'Thiếu môn học hoặc câu vai trò.');
+    sendJson(res, 400, 'bad_input', 'Thiếu môn học hoặc câu vai trò.');
+    return;
   }
   if (body.stage === 'revise' && (!body.currentHtml || !body.instruction?.trim())) {
-    return jsonError(400, 'bad_input', 'Sửa bài cần có file hiện tại và yêu cầu sửa.');
+    sendJson(res, 400, 'bad_input', 'Sửa bài cần có file hiện tại và yêu cầu sửa.');
+    return;
   }
 
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
-  const encoder = new TextEncoder();
 
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      const send = (event: SseEvent) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-      };
-      const fail = (code: string, message: string) => {
-        send({ type: 'error', code, message });
-        controller.close();
-      };
-      try {
-        const { notes, media, warnings } = await prepareAttachments(body.attachments ?? []);
-        const promptText = buildPromptText(body, notes);
-        const maxOutputTokens = body.stage === 'propose' ? 2048 : 65536;
-
-        // One generation attempt; on hard contract violations, one retry
-        // with the violations named so the model can fix them.
-        for (let attempt = 0; attempt < 2; attempt++) {
-          const textPart =
-            attempt === 0
-              ? promptText
-              : `${promptText}\n\nLƯU Ý SỬA LỖI: bản xuất trước đã vi phạm các quy tắc hợp đồng output. Hãy xuất lại toàn bộ file, sửa đúng các vi phạm đó, giữ nguyên mọi thứ khác.`;
-          const { text: raw, finishReason } = await callGeminiStream({
-            apiKey,
-            model,
-            parts: [{ text: textPart }, ...media],
-            maxOutputTokens,
-            onChunk: (chunkText) => send({ type: 'chunk', text: chunkText }),
-          });
-
-          if (body.stage === 'propose') {
-            send({ type: 'done', text: raw.trim(), warnings });
-            controller.close();
-            return;
-          }
-
-          const { html, fenced } = extractHtml(raw);
-          const violations = hardViolations(html);
-          if (violations.length > 0 && attempt === 0) {
-            send({ type: 'retry', violations: violations.map((v) => v.rule) });
-            continue;
-          }
-          if (violations.length > 0) {
-            fail(
-              'validation',
-              `Bài AI tạo ra vi phạm hợp đồng output (${violations.map((v) => v.rule).join('; ')}). Hãy thử lại hoặc sửa yêu cầu.`,
-            );
-            return;
-          }
-
-          const resultWarnings = [...warnings];
-          if (fenced) {
-            resultWarnings.push('AI đã bọc file trong khối markdown; hệ thống đã tự gỡ bỏ.');
-          }
-          const byteSize = new TextEncoder().encode(html).length;
-          if (byteSize > TARGET_HTML_BYTES) {
-            resultWarnings.push(
-              `File dài ${Math.round(byteSize / 1024)}KB, vượt mục tiêu 120KB. Bài vẫn dùng được, nhưng lần sửa sau nên yêu cầu gọn lại.`,
-            );
-          }
-          if (finishReason === 'MAX_TOKENS') {
-            resultWarnings.push('AI đã chạm giới hạn độ dài output; hãy kiểm tra kỹ cuối bài có bị cắt không.');
-          }
-          send({
-            type: 'done',
-            html,
-            title: extractTitle(html),
-            assumptions: extractLeadingComments(html),
-            warnings: resultWarnings,
-            byteSize,
-          });
-          controller.close();
-          return;
-        }
-      } catch (err) {
-        console.error('ai-soan-bai failed:', err);
-        const outcome =
-          err instanceof UserError
-            ? { code: 'bad_input', message: err.message }
-            : err instanceof GeminiError
-              ? { code: err.code, message: err.message }
-              : {
-                  code: 'generation_failed',
-                  message:
-                    'Không tạo được bài học. Hãy thử lại; nếu vẫn lỗi, hãy rút ngắn dàn ý hoặc tài liệu đính kèm.',
-                };
-        try {
-          fail(outcome.code, outcome.message);
-        } catch {
-          // Stream already closed (e.g. client disconnected).
-        }
-      }
-    },
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
   });
+  let ended = false;
+  const send = (event: SseEvent) => {
+    if (ended) return;
+    try {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    } catch {
+      ended = true;
+    }
+  };
+  const finish = () => {
+    if (ended) return;
+    ended = true;
+    try {
+      res.end();
+    } catch {
+      // Client already gone.
+    }
+  };
+  const fail = (code: string, message: string) => {
+    send({ type: 'error', code, message });
+    finish();
+  };
 
-  return new Response(stream, { headers: sseHeaders() });
+  try {
+    const { notes, media, warnings } = await prepareAttachments(body.attachments ?? []);
+    const promptText = buildPromptText(body, notes);
+    const maxOutputTokens = body.stage === 'propose' ? 2048 : 65536;
+
+    // One generation attempt; on hard contract violations, one retry
+    // with the violations named so the model can fix them.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const textPart =
+        attempt === 0
+          ? promptText
+          : `${promptText}\n\nLƯU Ý SỬA LỖI: bản xuất trước đã vi phạm các quy tắc hợp đồng output. Hãy xuất lại toàn bộ file, sửa đúng các vi phạm đó, giữ nguyên mọi thứ khác.`;
+      const { text: raw, finishReason } = await callGeminiStream({
+        apiKey,
+        model,
+        parts: [{ text: textPart }, ...media],
+        maxOutputTokens,
+        onChunk: (chunkText) => send({ type: 'chunk', text: chunkText }),
+      });
+
+      if (body.stage === 'propose') {
+        send({ type: 'done', text: raw.trim(), warnings });
+        finish();
+        return;
+      }
+
+      const { html, fenced } = extractHtml(raw);
+      const violations = hardViolations(html);
+      if (violations.length > 0 && attempt === 0) {
+        send({ type: 'retry', violations: violations.map((v) => v.rule) });
+        continue;
+      }
+      if (violations.length > 0) {
+        fail(
+          'validation',
+          `Bài AI tạo ra vi phạm hợp đồng output (${violations.map((v) => v.rule).join('; ')}). Hãy thử lại hoặc sửa yêu cầu.`,
+        );
+        return;
+      }
+
+      const resultWarnings = [...warnings];
+      if (fenced) {
+        resultWarnings.push('AI đã bọc file trong khối markdown; hệ thống đã tự gỡ bỏ.');
+      }
+      const byteSize = new TextEncoder().encode(html).length;
+      if (byteSize > TARGET_HTML_BYTES) {
+        resultWarnings.push(
+          `File dài ${Math.round(byteSize / 1024)}KB, vượt mục tiêu 120KB. Bài vẫn dùng được, nhưng lần sửa sau nên yêu cầu gọn lại.`,
+        );
+      }
+      if (finishReason === 'MAX_TOKENS') {
+        resultWarnings.push('AI đã chạm giới hạn độ dài output; hãy kiểm tra kỹ cuối bài có bị cắt không.');
+      }
+      send({
+        type: 'done',
+        html,
+        title: extractTitle(html),
+        assumptions: extractLeadingComments(html),
+        warnings: resultWarnings,
+        byteSize,
+      });
+      finish();
+      return;
+    }
+  } catch (err) {
+    console.error('ai-soan-bai failed:', err);
+    const outcome =
+      err instanceof UserError
+        ? { code: 'bad_input', message: err.message }
+        : err instanceof GeminiError
+          ? { code: err.code, message: err.message }
+          : {
+              code: 'generation_failed',
+              message:
+                'Không tạo được bài học. Hãy thử lại; nếu vẫn lỗi, hãy rút ngắn dàn ý hoặc tài liệu đính kèm.',
+            };
+    fail(outcome.code, outcome.message);
+  }
 }
