@@ -2,14 +2,13 @@
 // Gemini compose a single-file interactive HTML lesson, preview it in a
 // sandboxed iframe, revise it by chat until satisfied, then Chốt it into
 // "Bài của tôi". The prompt is assembled server-side from the same fields
-// (see api/_lib/prompt.ts); the browser never sees the API key.
+// (see api/ai-soan-bai.ts); the browser never sees the API key.
 //
-// Deferred for later: batch syllabus planning (Lên chương trình), profile
-// settings with pre-selected grades/subjects, and proposing HTML lessons
-// to Kho chung.
+// Deferred for later: batch syllabus planning (Lên chương trình) and
+// proposing HTML lessons to Kho chung.
 import { useRef, useState } from 'react';
 import type { Account, Lesson } from '../types';
-import { GRADES, SUBJECTS_BY_GRADE, roleSentenceFor } from '../ai/subjects';
+import { gradesFor, roleSentenceFor, subjectsFor } from '../ai/subjects';
 import type { AiRequestBody, AuthorMode, ChatTurn, WireAttachment } from '../ai/apiTypes';
 import { AiApiError, callAiSoanBai } from '../ai/client';
 import { useStore } from '../state/store';
@@ -60,15 +59,23 @@ function formatKb(bytes: number): string {
 export function AiStudio({
   account,
   onSaved,
+  onOpenSettings,
 }: {
   account: Account;
   onSaved: (lessonId: string) => void;
+  onOpenSettings: () => void;
 }) {
   const { dispatch } = useStore();
-  const [grade, setGrade] = useState(5);
-  const [subject, setSubject] = useState('Toán');
+  // Grade/subject pickers are scoped by the teacher's Hồ sơ giảng dạy
+  // when set; otherwise the full master lists are offered.
+  const profile = account.teachingProfile;
+  const gradeOptions = gradesFor(profile);
+  const initialGrade = gradeOptions[0] ?? 5;
+  const initialSubject = subjectsFor(profile, initialGrade)[0] ?? 'Toán';
+  const [grade, setGrade] = useState(initialGrade);
+  const [subject, setSubject] = useState(initialSubject);
   const [customSubject, setCustomSubject] = useState('');
-  const [roleSentence, setRoleSentence] = useState(() => roleSentenceFor(5, 'Toán'));
+  const [roleSentence, setRoleSentence] = useState(() => roleSentenceFor(initialGrade, initialSubject));
   const [roleEdited, setRoleEdited] = useState(false);
   const [mode, setMode] = useState<AuthorMode>('outline');
   const [topic, setTopic] = useState('');
@@ -101,7 +108,7 @@ export function AiStudio({
   };
 
   const changeGrade = (next: number) => {
-    const first = SUBJECTS_BY_GRADE[next][0];
+    const first = subjectsFor(profile, next)[0] ?? 'Toán';
     setGrade(next);
     setSubject(first);
     setCustomSubject('');
@@ -331,7 +338,7 @@ export function AiStudio({
             <label className="field">
               <span>Khối</span>
               <select value={grade} onChange={(e) => changeGrade(Number(e.target.value))} disabled={busy}>
-                {GRADES.map((g) => (
+                {gradeOptions.map((g) => (
                   <option key={g} value={g}>
                     Khối {g}
                   </option>
@@ -341,7 +348,7 @@ export function AiStudio({
             <label className="field">
               <span>Môn</span>
               <select value={subject} onChange={(e) => changeSubject(e.target.value)} disabled={busy}>
-                {SUBJECTS_BY_GRADE[grade].map((s) => (
+                {subjectsFor(profile, grade).map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -350,6 +357,14 @@ export function AiStudio({
               </select>
             </label>
           </div>
+          <p className="guide-text">
+            {profile && profile.grades.length > 0
+              ? 'Danh sách khối/môn lấy từ Hồ sơ giảng dạy của bạn.'
+              : 'Bạn chưa chọn khối/môn mặc định trong Hồ sơ — đang hiện tất cả các khối và môn.'}{' '}
+            <button type="button" className="btn btn-small btn-ghost" onClick={onOpenSettings} disabled={busy}>
+              Mở Hồ sơ
+            </button>
+          </p>
           {subject === CUSTOM_SUBJECT ? (
             <label className="field">
               <span>Tên môn học</span>

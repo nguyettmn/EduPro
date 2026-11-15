@@ -63,14 +63,16 @@ thái đang chọn trong điều hướng.
 
 ## Điều hướng (theo quy trình làm việc)
 
-- Giáo viên: Trang chính (“Hôm nay”), Lớp học, Soạn bài, Kho chung, Giới
-  thiệu. Trang chính liệt kê mọi việc cần xử lý, mỗi việc đều bấm vào được.
-  Lớp học là nơi xem học sinh, bài giao và chấm bài kèm đáp án của học sinh.
-  Soạn bài là một không gian duy nhất: bài của tôi, Pack, và bài trong phạm
-  vi quản lý; giao bài ngay từ bài học, cho cả lớp hoặc từng học sinh.
+- Giáo viên: Trang chính (“Hôm nay”), Lớp học, Soạn bài, Kho chung, Hồ
+  sơ. Trang chính liệt kê mọi việc cần xử lý, mỗi việc đều bấm vào được.
+  Lớp học là nơi tạo lớp mới, thêm học sinh bằng email, xem học sinh, bài
+  giao và chấm bài kèm đáp án của học sinh. Soạn bài là một không gian
+  duy nhất: bài của tôi, Pack, và bài trong phạm vi quản lý; giao bài ngay
+  từ bài học, cho cả lớp hoặc từng học sinh. Hồ sơ giữ hồ sơ giảng dạy
+  (khối và môn dạy, chọn trước để khỏi chọn lại mỗi lần soạn bài bằng AI).
 - Tổ trưởng, Hiệu trưởng, Admin: thêm mục Quản lý.
 - Học sinh: Trang chính, Space (tên lớp học của em, em tự đổi tên riêng),
-  Tutor Space, Giới thiệu. Bài giao nằm trong Space; bài giao riêng chỉ hiện
+  Tutor Space, Hồ sơ. Bài giao nằm trong Space; bài giao riêng chỉ hiện
   với học sinh được giao.
 
 ## Nội dung mẫu: Pack Toán 5 – Phân số

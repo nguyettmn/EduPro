@@ -1,7 +1,9 @@
-// Subject lists per grade (Khối 1–12) for the AI authoring test slice.
-// Test data only: the teacher's pre-selected grades/subjects in profile
-// settings will replace this when settings are built. Teachers can always
-// type a custom subject, so an incomplete list never blocks composing.
+// Master subject lists per grade (Khối 1–12): the lists teachers pick
+// from in Hồ sơ (profile settings). A teacher's pre-selected profile
+// scopes what the AI authoring flow offers; when no profile is set, the
+// full master lists are used. Teachers can always type a custom subject,
+// so an incomplete list never blocks composing.
+import type { TeachingProfile } from '../types';
 
 export const GRADES: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -23,4 +25,18 @@ export const SUBJECTS_BY_GRADE: Record<number, string[]> = {
 /** Default role sentence, pre-filled from the chosen grade + subject. */
 export function roleSentenceFor(grade: number, subject: string): string {
   return `Bạn là giáo viên lớp ${grade} dạy môn ${subject.toLowerCase()} với nhiều năm kinh nghiệm.`;
+}
+
+/** Grades the authoring flow offers: the profile's grades when set, else all. */
+export function gradesFor(profile?: TeachingProfile): number[] {
+  if (profile && profile.grades.length > 0) return [...profile.grades].sort((a, b) => a - b);
+  return GRADES;
+}
+
+/** Subjects the authoring flow offers for a grade: the profile's subjects
+ * for that grade when set, else the master list for the grade. */
+export function subjectsFor(profile: TeachingProfile | undefined, grade: number): string[] {
+  const picked = profile?.subjectsByGrade[String(grade)];
+  if (picked && picked.length > 0) return picked;
+  return SUBJECTS_BY_GRADE[grade];
 }

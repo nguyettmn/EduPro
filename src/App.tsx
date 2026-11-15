@@ -1,7 +1,7 @@
 // App composition: mock-login gate, shell, and state-based view routing.
 // Every route passes through the permission table before rendering.
 import { useState } from 'react';
-import { REFERENCE, StoreProvider, useStore } from './state/store';
+import { StoreProvider, useStore } from './state/store';
 import { canDo, canView, canViewTutorSummary, getNavItems, spaceNameFor } from './permissions';
 import type { Route } from './route';
 import { AccountPicker } from './components/AccountPicker';
@@ -44,7 +44,7 @@ function AppInner() {
 
   const isStudent = canDo(currentAccount, 'useTutor');
   const spaceName = isStudent
-    ? spaceNameFor(currentAccount, REFERENCE.CLASSES, state.spaceNames)
+    ? spaceNameFor(currentAccount, state.classes, state.spaceNames)
     : undefined;
   const activeView =
     route.view === 'lesson' ? (isStudent ? 'assignments' : 'studio') : route.view;

@@ -182,7 +182,7 @@ export function TutorSpace({
         anonymous: proposeAnonymous,
         targetRepo: proposeTarget,
         schoolId: student.schoolId ?? 'S1',
-        teamId: REFERENCE.CLASSES.find((c) => student.classIds.includes(c.id))?.teamId ?? null,
+        teamId: state.classes.find((c) => student.classIds.includes(c.id))?.teamId ?? null,
         stage: 'teacher',
         status: 'pending',
         game: { ...game, anonymous: proposeAnonymous },

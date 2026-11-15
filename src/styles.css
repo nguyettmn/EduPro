@@ -294,6 +294,10 @@ button.todo-row:hover { border-color: var(--role-color); }
 .field-row .field { flex: 1; min-width: 160px; }
 .check-row { display: flex; gap: 10px; align-items: center; font-weight: 600; margin: 8px 0; }
 .check-row input { width: auto; }
+.check-grid { display: flex; flex-wrap: wrap; gap: 0 18px; }
+.check-grid .check-row { margin: 6px 0; }
+.inline-add { display: flex; gap: 10px; align-items: flex-end; }
+.inline-add .field { flex: 1; }
 .repo-item { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 12px; }
 .repo-item-head {
   display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left;

@@ -1,11 +1,13 @@
 // Manage: account and progress lists scoped by the permission table.
-// Teachers and principals can create student accounts here.
+// Students are added by email (see AddStudentForm): teachers never
+// create student accounts directly (user decision 2026-11-15).
 import { useState } from 'react';
 import type { Account } from '../types';
 import { ROLE_META } from '../types';
 import { canDo, visibleClasses, visibleStudents, visibleTeachers } from '../permissions';
 import { REFERENCE, useStore } from '../state/store';
 import { RoleBadge } from './RoleBadge';
+import { TeachingProfileForm } from './TeachingProfile';
 import { EmptyState, SectionBand } from './ui';
 
 function initialsOf(name: string): string {
@@ -15,7 +17,7 @@ function initialsOf(name: string): string {
   return (first + last).toUpperCase();
 }
 
-export function CreateStudentForm({
+export function AddStudentForm({
   account,
   fixedClassId,
 }: {
@@ -23,23 +25,87 @@ export function CreateStudentForm({
   /** When set, the class select is hidden and the student joins this class. */
   fixedClassId?: string;
 }) {
-  const { dispatch } = useStore();
-  const classes = visibleClasses(account, REFERENCE.CLASSES);
+  const { state, dispatch } = useStore();
+  const classes = visibleClasses(account, state.classes);
+  const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [classId, setClassId] = useState(classes[0]?.id ?? '');
-  const [created, setCreated] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
 
-  if (!canDo(account, 'createStudentAccount') || classes.length === 0) return null;
+  if (!canDo(account, 'addStudent') || classes.length === 0) return null;
   const effectiveClassId = fixedClassId ?? classId;
-  const cls = REFERENCE.CLASSES.find((c) => c.id === effectiveClassId);
+  const cls = state.classes.find((c) => c.id === effectiveClassId);
+
+  const submit = () => {
+    const cleanEmail = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError('Email chưa đúng định dạng. Ví dụ: lan@example.com');
+      return;
+    }
+    const duplicate = state.accounts.some(
+      (a) => a.email?.toLowerCase() === cleanEmail.toLowerCase() && a.schoolId === (cls?.schoolId ?? account.schoolId),
+    );
+    if (duplicate) {
+      setError('Email này đã có trong trường rồi.');
+      return;
+    }
+    const displayName = name.trim() || cleanEmail.split('@')[0];
+    const id = `u-${Date.now()}`;
+    dispatch({
+      type: 'CREATE_STUDENT',
+      account: {
+        id,
+        name: displayName,
+        role: 'student',
+        schoolId: cls?.schoolId ?? account.schoolId,
+        teamId: null,
+        classIds: [effectiveClassId],
+        demoLogin: true,
+        initials: initialsOf(displayName),
+        email: cleanEmail,
+      },
+      tutor: {
+        studentId: id,
+        sessions: 0,
+        weakTopics: [],
+        chat: [],
+        selfGames: [],
+        reviewQuestionIds: [],
+        masteredIds: [],
+        bestScores: {},
+      },
+    });
+    setAdded(`${displayName} (${cleanEmail})`);
+    setEmail('');
+    setName('');
+    setError(null);
+  };
 
   return (
     <div className="form-card">
-      <h3 className="subhead">Tạo tài khoản học sinh</h3>
+      <h3 className="subhead">Thêm học sinh bằng email</h3>
+      <p className="guide-text">
+        Nhập email của học sinh để thêm em vào lớp. Bản demo chưa gửi email thật — em sẽ có trong
+        danh sách lớp ngay.
+      </p>
       <div className="field-row">
         <label className="field">
-          <span>Tên học sinh</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ví dụ: Lan" />
+          <span>Email học sinh</span>
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Ví dụ: lan@example.com"
+            inputMode="email"
+          />
+        </label>
+        <label className="field">
+          <span>Tên học sinh (không bắt buộc)</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Để trống thì lấy phần trước @"
+          />
         </label>
         {fixedClassId ? null : (
           <label className="field">
@@ -54,42 +120,20 @@ export function CreateStudentForm({
           </label>
         )}
       </div>
+      {error ? <p className="feedback-bad">{error}</p> : null}
       <button
         type="button"
         className="btn btn-primary"
-        disabled={name.trim() === '' || effectiveClassId === ''}
-        onClick={() => {
-          const id = `u-${Date.now()}`;
-          dispatch({
-            type: 'CREATE_STUDENT',
-            account: {
-              id,
-              name: name.trim(),
-              role: 'student',
-              schoolId: cls?.schoolId ?? account.schoolId,
-              teamId: null,
-              classIds: [effectiveClassId],
-              demoLogin: true,
-              initials: initialsOf(name.trim()),
-            },
-            tutor: {
-              studentId: id,
-              sessions: 0,
-              weakTopics: [],
-              chat: [],
-              selfGames: [],
-              reviewQuestionIds: [],
-              masteredIds: [],
-              bestScores: {},
-            },
-          });
-          setCreated(name.trim());
-          setName('');
-        }}
+        disabled={email.trim() === '' || effectiveClassId === ''}
+        onClick={submit}
       >
-        Tạo tài khoản
+        Thêm vào lớp
       </button>
-      {created ? <p className="feedback-ok">Đã tạo tài khoản cho {created}. Có thể đổi vai nhanh để vào thử.</p> : null}
+      {added ? (
+        <p className="feedback-ok">
+          Đã thêm {added} vào {cls?.name ?? 'lớp'}. Có thể đổi vai nhanh để vào thử.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -140,7 +184,7 @@ export function ManageViews({ account }: { account: Account }) {
                       ? REFERENCE.SCHOOLS.find((s) => s.id === a.schoolId)?.name ?? ''
                       : 'Tất cả các trường'}
                   </td>
-                  <td>{a.classIds.map((id) => REFERENCE.CLASSES.find((c) => c.id === id)?.name ?? id).join(', ') || '—'}</td>
+                  <td>{a.classIds.map((id) => state.classes.find((c) => c.id === id)?.name ?? id).join(', ') || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -165,7 +209,7 @@ export function ManageViews({ account }: { account: Account }) {
             <div key={t.id} className="person-row">
               <RoleBadge account={t} />
               <span className="muted">
-                {t.classIds.map((id) => REFERENCE.CLASSES.find((c) => c.id === id)?.name ?? id).join(', ')}
+                {t.classIds.map((id) => state.classes.find((c) => c.id === id)?.name ?? id).join(', ')}
               </span>
             </div>
           ))}
@@ -180,7 +224,7 @@ export function ManageViews({ account }: { account: Account }) {
             <div key={s.id} className="person-row">
               <RoleBadge account={s} />
               <span className="muted">
-                {s.classIds.map((id) => REFERENCE.CLASSES.find((c) => c.id === id)?.name ?? id).join(', ')}
+                {s.classIds.map((id) => state.classes.find((c) => c.id === id)?.name ?? id).join(', ')}
                 {' · '}
                 {state.tutor[s.id]?.sessions ?? 0} buổi luyện
               </span>
@@ -188,7 +232,7 @@ export function ManageViews({ account }: { account: Account }) {
           ))}
         </div>
       )}
-      <CreateStudentForm account={account} />
+      <AddStudentForm account={account} />
     </div>
   );
 }
@@ -198,7 +242,8 @@ export function SettingsView({ account }: { account: Account }) {
   const [confirming, setConfirming] = useState(false);
   return (
     <div>
-      <SectionBand title="Giới thiệu & dữ liệu demo" guide="Thông tin về bản demo này." />
+      <SectionBand title="Hồ sơ & giới thiệu" guide="Hồ sơ giảng dạy của bạn và thông tin về bản demo." />
+      <TeachingProfileForm account={account} />
       <div className="form-card">
         <h3 className="subhead">Về bản demo</h3>
         <p>

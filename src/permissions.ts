@@ -21,7 +21,8 @@ export type Action =
   | 'createContent'
   | 'assign'
   | 'grade'
-  | 'createStudentAccount'
+  | 'addStudent'
+  | 'createClass'
   | 'manageSchool'
   | 'manageSystem'
   | 'propose'
@@ -38,11 +39,15 @@ const ROLE_VIEWS: Record<Role, ViewId[]> = {
   student: ['dashboard', 'lesson', 'assignments', 'tutor', 'settings'],
 };
 
+// Students are added by email, never by teachers creating accounts
+// (user decision 2026-11-15). Teachers create their own classes; a
+// principal/admin creating a class would also need to pick its teacher,
+// which the current form does not offer.
 const ROLE_ACTIONS: Record<Role, Action[]> = {
-  admin: ['createContent', 'createStudentAccount', 'manageSchool', 'manageSystem', 'propose', 'approveTeam', 'approveSchool', 'reviewStudentProposal'],
-  principal: ['createContent', 'assign', 'createStudentAccount', 'manageSchool', 'propose', 'approveSchool'],
+  admin: ['createContent', 'addStudent', 'manageSchool', 'manageSystem', 'propose', 'approveTeam', 'approveSchool', 'reviewStudentProposal'],
+  principal: ['createContent', 'assign', 'addStudent', 'manageSchool', 'propose', 'approveSchool'],
   lead: ['createContent', 'assign', 'propose', 'approveTeam'],
-  teacher: ['createContent', 'assign', 'grade', 'createStudentAccount', 'propose', 'reviewStudentProposal'],
+  teacher: ['createContent', 'assign', 'grade', 'addStudent', 'createClass', 'propose', 'reviewStudentProposal'],
   student: ['propose', 'useTutor'],
 };
 
@@ -55,7 +60,7 @@ const NAV_LABELS: Record<ViewId, string> = {
   repo: 'Kho chung',
   tutor: 'Tutor Space',
   manage: 'Quản lý',
-  settings: 'Giới thiệu',
+  settings: 'Hồ sơ',
 };
 
 export function getNavItems(account: Account, spaceName?: string): NavItem[] {

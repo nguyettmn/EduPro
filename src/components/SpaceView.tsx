@@ -6,7 +6,7 @@ import { useState } from 'react';
 import type { Account, StudentAnswer } from '../types';
 import { QUESTIONS } from '../data/questions';
 import { assignmentVisibleToStudent, spaceNameFor } from '../permissions';
-import { REFERENCE, useStore } from '../state/store';
+import { useStore } from '../state/store';
 import type { Route } from '../route';
 import { QuizRunner } from './QuizRunner';
 import { HtmlLessonPlayer } from './HtmlLessonPlayer';
@@ -24,7 +24,7 @@ export function SpaceView({
   go: (route: Route) => void;
 }) {
   const { state, dispatch } = useStore();
-  const spaceName = spaceNameFor(account, REFERENCE.CLASSES, state.spaceNames);
+  const spaceName = spaceNameFor(account, state.classes, state.spaceNames);
   const assignments = state.assignments.filter((a) => assignmentVisibleToStudent(a, account));
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(spaceName);
@@ -209,7 +209,7 @@ export function SpaceView({
                 onClick={() => go({ view: 'assignments', assignmentId: a.id })}
               >
                 <span>
-                  <strong>{a.title}</strong> · {REFERENCE.CLASSES.find((c) => c.id === a.classId)?.name} · Hạn{' '}
+                  <strong>{a.title}</strong> · {state.classes.find((c) => c.id === a.classId)?.name} · Hạn{' '}
                   {formatDate(a.dueDate)} ({dueLabel(a.dueDate)})
                 </span>
                 <span className={mine ? 'status-done' : 'status-todo'}>

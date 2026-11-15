@@ -3,6 +3,7 @@
 // student's actual answers shown. Scoped through the permission table.
 import { useEffect, useState } from 'react';
 import type { Account, Answer, Assignment, Question, StudentAnswer } from '../types';
+import { GRADES } from '../ai/subjects';
 import { QUESTIONS } from '../data/questions';
 import { checkAnswer } from '../answers';
 import {
@@ -15,7 +16,7 @@ import { REFERENCE, useStore } from '../state/store';
 import type { Route } from '../route';
 import { Fraction, MathExpr, MixedNumber } from './Fraction';
 import { SolutionBlock } from './QuizRunner';
-import { CreateStudentForm } from './ManageViews';
+import { AddStudentForm } from './ManageViews';
 import { dueLabel, EmptyState, SectionBand, formatDate } from './ui';
 
 function topicTitle(topicId: string): string {
@@ -83,7 +84,7 @@ function GradingDetail({
       </button>
       <SectionBand
         title={assignment.title}
-        guide={`${REFERENCE.CLASSES.find((c) => c.id === assignment.classId)?.name ?? ''} · Hạn ${formatDate(assignment.dueDate)} (${dueLabel(assignment.dueDate)}) · ${lesson?.title ?? ''}`}
+        guide={`${state.classes.find((c) => c.id === assignment.classId)?.name ?? ''} · Hạn ${formatDate(assignment.dueDate)} (${dueLabel(assignment.dueDate)}) · ${lesson?.title ?? ''}`}
       />
       {notice ? <p className="notice">{notice}</p> : null}
       {submissions.length === 0 ? (
@@ -220,6 +221,107 @@ function GradingDetail({
   );
 }
 
+/** Teachers create their own classes here (user decision 2026-11-15).
+ * The new class belongs to the teacher's school + team, and the teacher
+ * is its teacher. Students are added to it by email, in the roster tab. */
+function CreateClassForm({
+  account,
+  defaultGrade,
+  go,
+}: {
+  account: Account;
+  defaultGrade: number;
+  go: (route: Route) => void;
+}) {
+  const { state, dispatch } = useStore();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [grade, setGrade] = useState(defaultGrade);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // When the teacher switches classes with the form closed, default the
+  // new class's grade to the class they are looking at.
+  useEffect(() => {
+    if (!open) setGrade(defaultGrade);
+  }, [defaultGrade, open]);
+
+  if (!canDo(account, 'createClass') || !account.schoolId || !account.teamId) return null;
+
+  if (!open) {
+    return (
+      <div>
+        {notice ? <p className="notice">{notice}</p> : null}
+        <button type="button" className="btn btn-secondary" onClick={() => setOpen(true)}>
+          + Tạo lớp mới
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="form-card">
+      <h3 className="subhead">Tạo lớp mới</h3>
+      <div className="field-row">
+        <label className="field">
+          <span>Tên lớp</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ví dụ: Lớp 5C" />
+        </label>
+        <label className="field">
+          <span>Khối</span>
+          <select value={grade} onChange={(e) => setGrade(Number(e.target.value))}>
+            {GRADES.map((g) => (
+              <option key={g} value={g}>
+                Khối {g}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {error ? <p className="feedback-bad">{error}</p> : null}
+      <div className="row-actions">
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={name.trim() === ''}
+          onClick={() => {
+            const cleanName = name.trim();
+            const duplicate = state.classes.some(
+              (c) => c.schoolId === account.schoolId && c.name.toLowerCase() === cleanName.toLowerCase(),
+            );
+            if (duplicate) {
+              setError('Trường này đã có một lớp tên như vậy rồi.');
+              return;
+            }
+            const id = `C-${Date.now()}`;
+            dispatch({
+              type: 'CREATE_CLASS',
+              classGroup: {
+                id,
+                schoolId: account.schoolId ?? '',
+                teamId: account.teamId ?? '',
+                name: cleanName,
+                grade,
+                teacherId: account.id,
+              },
+            });
+            setNotice(`Đã tạo ${cleanName}. Thêm học sinh bằng email trong tab Học sinh nhé.`);
+            setName('');
+            setError(null);
+            setOpen(false);
+            go({ view: 'classes', classId: id });
+          }}
+        >
+          Tạo lớp
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>
+          Hủy
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ClassView({
   account,
   route,
@@ -230,7 +332,7 @@ export function ClassView({
   go: (route: Route) => void;
 }) {
   const { state } = useStore();
-  const classes = visibleClasses(account, REFERENCE.CLASSES);
+  const classes = visibleClasses(account, state.classes);
   const [tab, setTab] = useState<'roster' | 'assignments'>(route.assignmentId ? 'assignments' : 'roster');
   const [gradingId, setGradingId] = useState<string | null>(route.assignmentId ?? null);
 
@@ -248,7 +350,7 @@ export function ClassView({
       : routeAssignment && classes.some((c) => c.id === routeAssignment.classId)
         ? routeAssignment.classId
         : (classes[0]?.id ?? '');
-  const activeClass = REFERENCE.CLASSES.find((c) => c.id === activeClassId);
+  const activeClass = state.classes.find((c) => c.id === activeClassId);
 
   if (classes.length === 0 || !activeClass) {
     return <EmptyState text="Bạn chưa có lớp nào trong phạm vi của mình." />;
@@ -299,6 +401,7 @@ export function ClassView({
           ))}
         </select>
       </label>
+      <CreateClassForm account={account} defaultGrade={activeClass.grade} go={go} />
       <div className="tabs" role="tablist">
         <button
           type="button"
@@ -359,7 +462,7 @@ export function ClassView({
               </table>
             </div>
           )}
-          <CreateStudentForm account={account} fixedClassId={activeClassId} />
+          <AddStudentForm account={account} fixedClassId={activeClassId} />
         </>
       ) : (
         <>

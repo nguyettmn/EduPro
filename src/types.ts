@@ -31,6 +31,20 @@ export interface Account {
   /** Shown on the mock-login picker. */
   demoLogin: boolean;
   initials: string;
+  /** Students added by email: the address the teacher invited. */
+  email?: string;
+  /** Teaching profile (Hồ sơ giảng dạy): the grades + subjects this
+   * account teaches, picked in Hồ sơ. The AI authoring flow only offers
+   * these grades/subjects when a profile is set. */
+  teachingProfile?: TeachingProfile;
+}
+
+/** Grades + subjects a teacher pre-selects in profile settings.
+ * subjectsByGrade keys are grade numbers as strings; values are the
+ * selected subject names for that grade (master list + hand-added). */
+export interface TeachingProfile {
+  grades: number[];
+  subjectsByGrade: Record<string, string[]>;
 }
 
 export interface School {

@@ -7,12 +7,14 @@ import type {
   Account,
   Assignment,
   ChatMsg,
+  ClassGroup,
   GameDef,
   Lesson,
   Proposal,
   RepoItem,
   StudentAnswer,
   Submission,
+  TeachingProfile,
   TutorData,
 } from '../types';
 import {
@@ -35,6 +37,8 @@ import { topicResults, updateWeakTopics } from '../answers';
 export interface AppState {
   currentAccountId: string | null;
   accounts: Account[];
+  /** Classes are mutable state: teachers can create new ones. */
+  classes: ClassGroup[];
   lessons: Lesson[];
   assignments: Assignment[];
   submissions: Submission[];
@@ -55,6 +59,7 @@ export function buildInitialState(): AppState {
   return {
     currentAccountId: null,
     accounts: clone(ACCOUNTS),
+    classes: clone(CLASSES),
     lessons: clone([...PACK_LESSONS, ...LESSON_COPIES]),
     assignments: clone(ASSIGNMENTS),
     submissions: clone(SUBMISSIONS),
@@ -77,6 +82,8 @@ export type Action =
   | { type: 'CREATE_ASSIGNMENT'; assignment: Assignment }
   | { type: 'COPY_TO_MY_SPACE'; lesson: Lesson }
   | { type: 'CREATE_STUDENT'; account: Account; tutor: TutorData }
+  | { type: 'CREATE_CLASS'; classGroup: ClassGroup }
+  | { type: 'SET_TEACHING_PROFILE'; accountId: string; profile: TeachingProfile }
   | { type: 'ADD_REVIEW_QUESTION'; studentId: string; questionId: string }
   | { type: 'MARK_MASTERED'; studentId: string; questionId: string }
   | { type: 'ADD_CHAT'; studentId: string; message: ChatMsg }
@@ -166,6 +173,27 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         accounts: [...state.accounts, action.account],
         tutor: { ...state.tutor, [action.account.id]: action.tutor },
+      };
+    case 'CREATE_CLASS': {
+      // The new class must also join the teacher's class list: teacher
+      // visibility (visibleClasses) is driven by account.classIds.
+      const teacherId = action.classGroup.teacherId;
+      return {
+        ...state,
+        classes: [...state.classes, action.classGroup],
+        accounts: state.accounts.map((a) =>
+          a.id === teacherId && !a.classIds.includes(action.classGroup.id)
+            ? { ...a, classIds: [...a.classIds, action.classGroup.id] }
+            : a,
+        ),
+      };
+    }
+    case 'SET_TEACHING_PROFILE':
+      return {
+        ...state,
+        accounts: state.accounts.map((a) =>
+          a.id === action.accountId ? { ...a, teachingProfile: action.profile } : a,
+        ),
       };
     case 'ADD_REVIEW_QUESTION': {
       const t = state.tutor[action.studentId];
@@ -268,7 +296,8 @@ export function useStore(): StoreContextValue {
   return ctx;
 }
 
-// Static reference data (not part of the mutable demo state).
-export const REFERENCE = { SCHOOLS, TEAMS, CLASSES, PACK };
+// Static reference data (not part of the mutable demo state). Classes are
+// NOT here: they live in AppState because teachers can create new ones.
+export const REFERENCE = { SCHOOLS, TEAMS, PACK };
 
 export type { StudentAnswer };

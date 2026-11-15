@@ -19,8 +19,8 @@ import type { Route } from '../route';
 import { RoleBadge } from './RoleBadge';
 import { daysUntil, dueLabel, EmptyState, SectionBand, StatCard, formatDate, todayLabel } from './ui';
 
-function className(classId: string): string {
-  return REFERENCE.CLASSES.find((c) => c.id === classId)?.name ?? classId;
+function className(classes: ClassGroup[], classId: string): string {
+  return classes.find((c) => c.id === classId)?.name ?? classId;
 }
 
 function accountName(accounts: Account[], id: string): string {
@@ -37,7 +37,7 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
   const meta = ROLE_META[account.role];
   const students = visibleStudents(account, state.accounts);
   const teachers = visibleTeachers(account, state.accounts);
-  const classes = visibleClasses(account, REFERENCE.CLASSES);
+  const classes = visibleClasses(account, state.classes);
   const isStudent = account.role === 'student';
   const myAssignments = isStudent
     ? state.assignments.filter((a) => assignmentVisibleToStudent(a, account))
@@ -153,7 +153,7 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
               <tbody>
                 {REFERENCE.SCHOOLS.map((s) => {
                   const schoolAccounts = state.accounts.filter((a) => a.schoolId === s.id);
-                  const schoolClasses = REFERENCE.CLASSES.filter((c) => c.schoolId === s.id);
+                  const schoolClasses = state.classes.filter((c) => c.schoolId === s.id);
                   return (
                     <tr key={s.id}>
                       <td>{s.name}</td>
@@ -204,7 +204,7 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
                   return (
                     <tr key={t.id}>
                       <td>{t.name}</td>
-                      <td>{t.classIds.map(className).join(', ')}</td>
+                      <td>{t.classIds.map((id) => className(state.classes, id)).join(', ')}</td>
                       <td>{assigned.length}</td>
                       <td>{waiting}</td>
                     </tr>
@@ -238,7 +238,7 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
               {teachers.map((t) => (
                 <div key={t.id} className="person-row">
                   <RoleBadge account={t} />
-                  <span className="muted">{t.classIds.map(className).join(', ')}</span>
+                  <span className="muted">{t.classIds.map((id) => className(state.classes, id)).join(', ')}</span>
                 </div>
               ))}
             </div>
@@ -358,7 +358,7 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
                     onClick={() => go({ view: 'assignments', assignmentId: a.id })}
                   >
                     <span>
-                      <strong>{a.title}</strong> · {className(a.classId)} · Hạn {formatDate(a.dueDate)} (
+                      <strong>{a.title}</strong> · {className(state.classes, a.classId)} · Hạn {formatDate(a.dueDate)} (
                       {dueLabel(a.dueDate)})
                     </span>
                     <span className={sub ? 'status-done' : 'status-todo'}>
@@ -444,7 +444,7 @@ function StudentProgressTable({
                 return (
                   <tr key={st.id}>
                     <td>{st.name}</td>
-                    <td>{st.classIds.map(className).join(', ')}</td>
+                    <td>{st.classIds.map((id) => className(classes, id)).join(', ')}</td>
                     <td>{stats.submitted}</td>
                     <td>{stats.avg === null ? '—' : `${stats.avg}%`}</td>
                     <td>{weakTopicsLabel(st)}</td>

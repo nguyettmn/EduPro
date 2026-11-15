@@ -36,7 +36,7 @@ function AssignSheet({
   onBack: () => void;
 }) {
   const { state, dispatch } = useStore();
-  const classes = visibleClasses(account, REFERENCE.CLASSES);
+  const classes = visibleClasses(account, state.classes);
   const [scope, setScope] = useState<'class' | 'students'>('class');
   const [classId, setClassId] = useState(classes[0]?.id ?? '');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -48,7 +48,7 @@ function AssignSheet({
   const classStudents = visibleStudents(account, state.accounts).filter((s) =>
     s.classIds.includes(classId),
   );
-  const className = REFERENCE.CLASSES.find((c) => c.id === classId)?.name ?? '';
+  const className = state.classes.find((c) => c.id === classId)?.name ?? '';
 
   if (done) {
     return (
@@ -551,6 +551,7 @@ export function StudioShell({
             setSelectedId(lessonId);
             setNotice('Đã lưu bài AI soạn vào Bài của tôi. Bạn có thể giao bài ngay từ đây.');
           }}
+          onOpenSettings={() => go({ view: 'settings' })}
         />
       ) : null}
 
