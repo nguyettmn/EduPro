@@ -2,7 +2,7 @@
 // Gemini compose a single-file interactive HTML lesson, preview it in a
 // sandboxed iframe, revise it by chat until satisfied, then Chốt it into
 // "Bài của tôi". The prompt is assembled server-side from the same fields
-// (see src/ai/prompt.ts); the browser never sees the API key.
+// (see api/_lib/prompt.ts); the browser never sees the API key.
 //
 // Deferred for later: batch syllabus planning (Lên chương trình), profile
 // settings with pre-selected grades/subjects, and proposing HTML lessons
@@ -10,8 +10,7 @@
 import { useRef, useState } from 'react';
 import type { Account, Lesson } from '../types';
 import { GRADES, SUBJECTS_BY_GRADE, roleSentenceFor } from '../ai/subjects';
-import type { AuthorMode } from '../ai/prompt';
-import type { AiRequestBody, ChatTurn, WireAttachment } from '../ai/apiTypes';
+import type { AiRequestBody, AuthorMode, ChatTurn, WireAttachment } from '../ai/apiTypes';
 import { AiApiError, callAiSoanBai } from '../ai/client';
 import { useStore } from '../state/store';
 import { SectionBand } from './ui';

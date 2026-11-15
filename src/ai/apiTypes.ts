@@ -1,6 +1,10 @@
 // Shared wire types for POST /api/ai-soan-bai. Imported by both the
 // browser client and the Vercel function so the two sides cannot drift.
-import type { AuthorMode } from './prompt';
+// This file has no imports of its own (types only): the function imports
+// it with `import type`, which is erased before bundling, so it is safe
+// for the function to reference it from ../src. Runtime code the function
+// needs must live under api/ instead (see api/_lib/prompt.ts).
+export type AuthorMode = 'auto' | 'topic' | 'outline';
 
 export interface WireAttachment {
   name: string;

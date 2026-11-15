@@ -5,7 +5,7 @@
 // ai-soan-bai's own handler logic. Remove once diagnosed.
 import { inflateRawSync } from 'node:zlib';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { buildLessonPrompt } from '../src/ai/prompt';
+import { buildLessonPrompt } from './_lib/prompt';
 
 export const config = { maxDuration: 300 };
 

@@ -19,12 +19,19 @@
 //   {"type":"done", ...}                 final result (text for propose, html for generate/revise)
 //   {"type":"error","code":"...","message":"..."}  terminal failure
 //
-// HANDLER STYLE: this MUST use the classic Node (req, res) signature.
-// The Web Request/Response signature was tried first and does not work
-// on this project: the trivial ping endpoint hung with 0 bytes and this
-// endpoint returned 500 FUNCTION_INVOCATION_FAILED on every call
-// (observed 2026-11-15), while the Node-style ping returned 200 on the
-// same deployment. Do not convert this file back to the Web signature.
+// HANDLER STYLE: this uses the classic Node (req, res) signature. The
+// Web Request/Response signature was tried first for the ping endpoint
+// and hung without responding on this project, while the Node-style ping
+// returned 200 on the same deployment (observed 2026-11-15); Node style
+// is the proven pattern here, so do not convert this file back.
+//
+// RUNTIME IMPORTS MUST LIVE UNDER api/. Every version of this function
+// that imported runtime code from ../src (the prompt module) crashed
+// with 500 FUNCTION_INVOCATION_FAILED on every call, while otherwise
+// identical probes without that import returned 200 (proven 2026-11-15
+// with ping2/ping3/ping4). The prompt module therefore lives at
+// api/_lib/prompt.ts. Type-only imports from ../src are fine — they are
+// erased before bundling.
 //
 // Test-slice limits: total attachments <= 4MB decoded (Vercel body limit
 // is 4.5MB); the frontend enforces a smaller cap. Function max duration
@@ -36,16 +43,11 @@ import {
   buildLessonPrompt,
   buildProposePrompt,
   buildRevisePrompt,
-} from '../src/ai/prompt';
-import type { AttachmentNote } from '../src/ai/prompt';
+} from './_lib/prompt';
+import type { AttachmentNote } from './_lib/prompt';
 import type { AiRequestBody, WireAttachment } from '../src/ai/apiTypes';
 
-// NOTE (diagnosing a persistent 500, 2026-11-15): the maxDuration config
-// export is REMOVED for now. It is the one ingredient shared by every
-// crashing version of this function and absent from the working ping
-// endpoint. If removing it fixes the 500, the duration limit will be
-// restored cautiously (generation needs more than the default).
-// export const config = { maxDuration: 300 };
+export const config = { maxDuration: 300 };
 
 const DEFAULT_MODEL = 'gemini-3.1-pro-preview';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';

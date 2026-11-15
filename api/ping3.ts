@@ -1,6 +1,6 @@
 // Diagnostic: config export + import from ../src/ai, no zlib, no type
 // imports. Remove once diagnosed.
-import { buildLessonPrompt } from '../src/ai/prompt';
+import { buildLessonPrompt } from './_lib/prompt';
 
 export const config = { maxDuration: 300 };
 
