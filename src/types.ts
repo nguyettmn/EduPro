@@ -152,6 +152,8 @@ export interface Assignment {
   lessonId: string;
   title: string;
   classId: string;
+  /** When set and non-empty, only these students see and do the assignment. */
+  studentIds?: string[];
   createdBy: string;
   /** ISO date (yyyy-mm-dd). */
   dueDate: string;
@@ -250,7 +252,7 @@ export interface TutorData {
 
 export type ViewId =
   | 'dashboard'
-  | 'library'
+  | 'classes'
   | 'lesson'
   | 'studio'
   | 'assignments'

@@ -36,17 +36,37 @@ export function StatCard({
   value,
   sub,
   color,
+  onClick,
 }: {
   label: string;
   value: string;
   sub?: string;
   color?: string;
+  /** When provided, the card renders as a button that navigates. */
+  onClick?: () => void;
 }) {
-  return (
-    <div className="stat-card" style={color ? { borderTopColor: color } : undefined}>
+  const inner = (
+    <>
       <div className="stat-label">{label}</div>
       <div className="stat-value">{value}</div>
       {sub ? <div className="stat-sub">{sub}</div> : null}
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className="stat-card stat-card-btn"
+        style={color ? { borderTopColor: color } : undefined}
+        onClick={onClick}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return (
+    <div className="stat-card" style={color ? { borderTopColor: color } : undefined}>
+      {inner}
     </div>
   );
 }
@@ -56,6 +76,15 @@ export function formatDate(isoDate: string): string {
   const d = new Date(`${isoDate}T00:00:00`);
   if (Number.isNaN(d.getTime())) return isoDate;
   return `ngày ${d.getDate()} tháng ${d.getMonth() + 1} năm ${d.getFullYear()}`;
+}
+
+const WEEKDAYS = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+
+/** Today's date in Vietnamese, e.g. "Thứ bảy, ngày 15 tháng 11 năm 2025". */
+export function todayLabel(): string {
+  const d = new Date();
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return `${WEEKDAYS[d.getDay()]}, ${formatDate(iso)}`;
 }
 
 export function daysUntil(isoDate: string): number {

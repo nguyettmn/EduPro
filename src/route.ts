@@ -3,7 +3,7 @@ import type { ViewId } from './types';
 
 export interface Route {
   view: ViewId;
-  /** Lesson being viewed (library detail / studio preview). */
+  /** Lesson being viewed (lesson detail page). */
   lessonId?: string;
   /** Lesson detail tab. */
   tab?: 'content' | 'practice' | 'game';
@@ -11,4 +11,8 @@ export interface Route {
   assignmentId?: string;
   /** Student whose Tutor Space summary is being viewed by a manager. */
   studentId?: string;
+  /** Class selected in the Classes view (deep link target). */
+  classId?: string;
+  /** View to return to from the Tutor Space summary back button. */
+  from?: ViewId;
 }

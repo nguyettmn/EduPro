@@ -1,13 +1,15 @@
-// Studio: a functional-but-simple lesson composer working on COPIES.
-// Full redesign of lesson authoring comes later; this frame version keeps
-// section list, select, edit title/text, add/remove/reorder, and propose.
+// Studio: one lesson workspace. Compose on COPIES (never edit someone
+// else's original), browse the Pack, and assign any lesson — copy or
+// pack original — to a class or to individual students, from the lesson.
 import { useEffect, useState } from 'react';
 import type { Account, Lesson, LessonSection } from '../types';
-import { managedAccounts } from '../permissions';
-import { useStore } from '../state/store';
+import { QUESTIONS } from '../data/questions';
+import { managedAccounts, visibleClasses, visibleStudents } from '../permissions';
+import { REFERENCE, useStore } from '../state/store';
+import type { Route } from '../route';
 import { MathExpr } from './Fraction';
 import { LessonPlayer } from './LessonPlayer';
-import { EmptyState, SectionBand } from './ui';
+import { EmptyState, SectionBand, TopicTag } from './ui';
 
 const BLANK_SECTION = (id: string): LessonSection => ({
   id,
@@ -16,20 +18,216 @@ const BLANK_SECTION = (id: string): LessonSection => ({
   steps: ['Bước 1: viết hướng dẫn ở đây.'],
 });
 
-export function StudioShell({ account }: { account: Account }) {
+const todayIso = (): string => new Date().toISOString().slice(0, 10);
+const plusDays = (n: number): string =>
+  new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+
+function AssignSheet({
+  account,
+  lesson,
+  go,
+  onBack,
+}: {
+  account: Account;
+  lesson: Lesson;
+  go: (route: Route) => void;
+  onBack: () => void;
+}) {
   const { state, dispatch } = useStore();
-  const [tab, setTab] = useState<'mine' | 'managed'>('mine');
+  const classes = visibleClasses(account, REFERENCE.CLASSES);
+  const [scope, setScope] = useState<'class' | 'students'>('class');
+  const [classId, setClassId] = useState(classes[0]?.id ?? '');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [title, setTitle] = useState(`Luyện tập: ${lesson.title}`);
+  const [dueDate, setDueDate] = useState(plusDays(7));
+  const [attempts, setAttempts] = useState(2);
+  const [done, setDone] = useState<{ className: string; count: number } | null>(null);
+
+  const classStudents = visibleStudents(account, state.accounts).filter((s) =>
+    s.classIds.includes(classId),
+  );
+  const className = REFERENCE.CLASSES.find((c) => c.id === classId)?.name ?? '';
+
+  if (done) {
+    return (
+      <div>
+        <p className="notice">
+          Đã giao cho {done.className} ({done.count} học sinh).
+        </p>
+        <div className="row-actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => go({ view: 'classes', classId })}
+          >
+            Xem tiến độ lớp
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={onBack}>
+            Xong
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <button type="button" className="btn btn-ghost" onClick={onBack}>
+        ← Quay lại soạn bài
+      </button>
+      <div className="form-card">
+        <h3 className="subhead">Giao bài: {lesson.title}</h3>
+        <div className="field">
+          <span>Giao cho</span>
+          <label className="check-row">
+            <input
+              type="radio"
+              name="assign-scope"
+              checked={scope === 'class'}
+              onChange={() => setScope('class')}
+            />
+            <span>Cả lớp</span>
+          </label>
+          <label className="check-row">
+            <input
+              type="radio"
+              name="assign-scope"
+              checked={scope === 'students'}
+              onChange={() => setScope('students')}
+            />
+            <span>Học sinh riêng</span>
+          </label>
+        </div>
+        <label className="field">
+          <span>Lớp</span>
+          <select
+            value={classId}
+            onChange={(e) => {
+              setClassId(e.target.value);
+              setSelectedIds([]);
+            }}
+          >
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {scope === 'students' ? (
+          <div className="field">
+            <span>Chọn học sinh</span>
+            {classStudents.length === 0 ? (
+              <p className="guide-text">Lớp này chưa có học sinh nào.</p>
+            ) : (
+              <div className="check-list">
+                {classStudents.map((s) => (
+                  <label key={s.id} className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(s.id)}
+                      onChange={(e) =>
+                        setSelectedIds((prev) =>
+                          e.target.checked ? [...prev, s.id] : prev.filter((id) => id !== s.id),
+                        )
+                      }
+                    />
+                    <span>{s.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {selectedIds.length === 0 ? (
+              <p className="guide-text">Chọn ít nhất một học sinh.</p>
+            ) : null}
+          </div>
+        ) : null}
+        <label className="field">
+          <span>Tiêu đề</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </label>
+        <div className="field-row">
+          <label className="field">
+            <span>Hạn nộp</span>
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Số lần làm tối đa</span>
+            <input
+              type="number"
+              min={1}
+              max={5}
+              value={attempts}
+              onChange={(e) => setAttempts(Math.max(1, Number(e.target.value) || 1))}
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={classId === '' || (scope === 'students' && selectedIds.length === 0)}
+          onClick={() => {
+            dispatch({
+              type: 'CREATE_ASSIGNMENT',
+              assignment: {
+                id: `ASG-${Date.now()}`,
+                lessonId: lesson.id,
+                title: title.trim() !== '' ? title.trim() : `Luyện tập: ${lesson.title}`,
+                classId,
+                ...(scope === 'students' ? { studentIds: selectedIds } : {}),
+                createdBy: account.id,
+                dueDate,
+                attemptsAllowed: attempts,
+                status: 'active',
+                createdAt: todayIso(),
+              },
+            });
+            setDone({
+              className,
+              count: scope === 'students' ? selectedIds.length : classStudents.length,
+            });
+          }}
+        >
+          Giao bài
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function StudioShell({
+  account,
+  route,
+  go,
+}: {
+  account: Account;
+  route: Route;
+  go: (route: Route) => void;
+}) {
+  const { state, dispatch } = useStore();
+  const [tab, setTab] = useState<'mine' | 'pack' | 'managed'>('mine');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Lesson | null>(null);
   const [saved, setSaved] = useState(false);
   const [proposeTarget, setProposeTarget] = useState<'team' | 'school'>('team');
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [topicFilter, setTopicFilter] = useState<string | null>(null);
+  const [assignLessonId, setAssignLessonId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const myCopies = state.lessons.filter((l) => l.ownerId === account.id);
   const managed = managedAccounts(account, state.accounts);
   const managedCopies = state.lessons.filter(
     (l) => l.ownerId && managed.some((a) => a.id === l.ownerId),
   );
+  const pack = REFERENCE.PACK;
+  const packLessons = pack.lessonIds
+    .map((id) => state.lessons.find((l) => l.id === id))
+    .filter((l): l is Lesson => Boolean(l))
+    .filter((l) => !topicFilter || l.topicIds.includes(topicFilter));
+  const assignLesson = assignLessonId
+    ? state.lessons.find((l) => l.id === assignLessonId)
+    : undefined;
 
   useEffect(() => {
     const lesson = myCopies.find((l) => l.id === selectedId);
@@ -37,6 +235,23 @@ export function StudioShell({ account }: { account: Account }) {
     setSaved(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
+
+  // Deep link from the lesson detail page after copying: open the new copy.
+  const routeLessonId = route.lessonId;
+  useEffect(() => {
+    if (routeLessonId && myCopies.some((l) => l.id === routeLessonId)) {
+      setTab('mine');
+      setSelectedId(routeLessonId);
+      setNotice('Đã copy bài về không gian của bạn. Bản sao đang mở để sửa.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeLessonId]);
+
+  const pickTab = (next: 'mine' | 'pack' | 'managed') => {
+    setTab(next);
+    setAssignLessonId(null);
+    setNotice(null);
+  };
 
   const updateSection = (sectionId: string, patch: Partial<LessonSection>) => {
     if (!draft) return;
@@ -82,12 +297,14 @@ export function StudioShell({ account }: { account: Account }) {
     };
     dispatch({ type: 'CREATE_LESSON_COPY', lesson });
     setSelectedId(lesson.id);
+    setNotice('Đã tạo bài mới.');
   };
 
   const save = () => {
     if (!draft) return;
     dispatch({ type: 'UPDATE_LESSON_COPY', lesson: draft });
     setSaved(true);
+    setNotice('Đã lưu bài học.');
   };
 
   const propose = () => {
@@ -111,6 +328,7 @@ export function StudioShell({ account }: { account: Account }) {
         createdAt: new Date().toISOString().slice(0, 10),
       },
     });
+    setNotice(`Đã gửi đề xuất lên ${proposeTarget === 'team' ? 'Kho Tổ' : 'Kho Trường'}.`);
   };
 
   const copyToMine = (source: Lesson) => {
@@ -124,19 +342,24 @@ export function StudioShell({ account }: { account: Account }) {
     dispatch({ type: 'COPY_TO_MY_SPACE', lesson: copy });
     setTab('mine');
     setSelectedId(copy.id);
+    setNotice('Đã copy bài về không gian của bạn.');
   };
 
   return (
     <div>
       <SectionBand
         title="Soạn bài"
-        guide="Bạn làm việc trên BẢN SAO của mình. Bản gốc của người khác không bao giờ bị sửa trực tiếp. Bản thiết kế lại đầy đủ sẽ đến sau."
+        guide="Bạn làm việc trên BẢN SAO của mình. Bản gốc của người khác không bao giờ bị sửa trực tiếp. Soạn xong thì giao ngay từ bài học đó."
       />
+      {notice ? <p className="notice">{notice}</p> : null}
       <div className="tabs" role="tablist">
-        <button type="button" className={tab === 'mine' ? 'tab tab-active' : 'tab'} onClick={() => setTab('mine')}>
-          Của tôi ({myCopies.length})
+        <button type="button" className={tab === 'mine' ? 'tab tab-active' : 'tab'} onClick={() => pickTab('mine')}>
+          Bài của tôi ({myCopies.length})
         </button>
-        <button type="button" className={tab === 'managed' ? 'tab tab-active' : 'tab'} onClick={() => setTab('managed')}>
+        <button type="button" className={tab === 'pack' ? 'tab tab-active' : 'tab'} onClick={() => pickTab('pack')}>
+          Pack
+        </button>
+        <button type="button" className={tab === 'managed' ? 'tab tab-active' : 'tab'} onClick={() => pickTab('managed')}>
           Trong phạm vi quản lý ({managedCopies.length})
         </button>
       </div>
@@ -147,21 +370,44 @@ export function StudioShell({ account }: { account: Account }) {
             <button type="button" className="btn btn-primary" onClick={createBlank}>
               + Bài mới
             </button>
-            {myCopies.length === 0 ? <EmptyState text="Bạn chưa có bản sao nào. Copy một bài từ Thư viện hoặc Kho chung." /> : null}
+            {myCopies.length === 0 ? <EmptyState text="Bạn chưa có bản sao nào. Copy một bài từ tab Pack hoặc Kho chung." /> : null}
             {myCopies.map((l) => (
-              <button
+              <div
                 key={l.id}
-                type="button"
-                className={l.id === selectedId ? 'studio-item studio-item-active' : 'studio-item'}
-                onClick={() => setSelectedId(l.id)}
+                className={l.id === selectedId ? 'studio-card studio-card-active' : 'studio-card'}
               >
-                <strong>{l.title}</strong>
-                <span className="muted">{l.sections.length} phần</span>
-              </button>
+                <button
+                  type="button"
+                  className="studio-card-main"
+                  onClick={() => {
+                    setSelectedId(l.id);
+                    setAssignLessonId(null);
+                    setNotice(null);
+                  }}
+                >
+                  <strong>{l.title}</strong>
+                  <span className="muted">{l.sections.length} phần</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-small btn-secondary"
+                  onClick={() => setAssignLessonId(l.id)}
+                >
+                  Giao bài
+                </button>
+              </div>
             ))}
           </div>
           <div className="studio-editor">
-            {!draft ? (
+            {assignLesson ? (
+              <AssignSheet
+                key={assignLesson.id}
+                account={account}
+                lesson={assignLesson}
+                go={go}
+                onBack={() => setAssignLessonId(null)}
+              />
+            ) : !draft ? (
               <EmptyState text="Chọn một bài bên trái để sửa, hoặc tạo bài mới." />
             ) : (
               <>
@@ -252,6 +498,7 @@ export function StudioShell({ account }: { account: Account }) {
                     dispatch({ type: 'DELETE_LESSON_COPY', lessonId: draft.id });
                     setSelectedId(null);
                     setDraft(null);
+                    setNotice('Đã xóa bản sao.');
                   }}
                 >
                   Xóa bản sao này
@@ -260,7 +507,85 @@ export function StudioShell({ account }: { account: Account }) {
             )}
           </div>
         </div>
-      ) : (
+      ) : null}
+
+      {tab === 'pack' ? (
+        assignLesson ? (
+          <AssignSheet
+            key={assignLesson.id}
+            account={account}
+            lesson={assignLesson}
+            go={go}
+            onBack={() => setAssignLessonId(null)}
+          />
+        ) : (
+          <div>
+            <div className="pack-card" style={{ borderTopColor: pack.color }}>
+              <div className="pack-title">{pack.title}</div>
+              <div className="muted">
+                Khối {pack.grade} · Môn {pack.subject} · {pack.lessonIds.length} bài học · {QUESTIONS.length} câu hỏi
+              </div>
+              <div className="tag-row">
+                {pack.topics.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={topicFilter === t.id ? 'topic-filter topic-filter-active' : 'topic-filter'}
+                    style={{ borderColor: t.color, color: t.color }}
+                    onClick={() => setTopicFilter(topicFilter === t.id ? null : t.id)}
+                  >
+                    {t.code} · {t.title}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="lesson-grid">
+              {packLessons.map((l) => {
+                const topics = pack.topics.filter((t) => l.topicIds.includes(t.id));
+                return (
+                  <div key={l.id} className="lesson-card" style={{ borderTopColor: l.color }}>
+                    <span className="lesson-card-title">{l.title}</span>
+                    <span className="tag-row">
+                      {topics.map((t) => (
+                        <TopicTag key={t.id} topic={t} />
+                      ))}
+                    </span>
+                    <span className="muted">
+                      {l.sections.length} phần · {l.questionIds.length} câu hỏi
+                    </span>
+                    <span className="row-actions">
+                      <button
+                        type="button"
+                        className="btn btn-small"
+                        onClick={() => go({ view: 'lesson', lessonId: l.id, tab: 'content' })}
+                      >
+                        Xem
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-small btn-secondary"
+                        onClick={() => copyToMine(l)}
+                      >
+                        Copy về của tôi
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-small btn-primary"
+                        onClick={() => setAssignLessonId(l.id)}
+                      >
+                        Giao bài
+                      </button>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {packLessons.length === 0 ? <EmptyState text="Không có bài học nào thuộc chủ đề này." /> : null}
+          </div>
+        )
+      ) : null}
+
+      {tab === 'managed' ? (
         <div>
           <p className="guide-text">
             Đây là bản sao của những người bạn quản lý. Bạn chỉ xem và copy về không gian của mình, không sửa trực
@@ -293,7 +618,7 @@ export function StudioShell({ account }: { account: Account }) {
             })
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

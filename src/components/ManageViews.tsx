@@ -15,7 +15,14 @@ function initialsOf(name: string): string {
   return (first + last).toUpperCase();
 }
 
-function CreateStudentForm({ account }: { account: Account }) {
+export function CreateStudentForm({
+  account,
+  fixedClassId,
+}: {
+  account: Account;
+  /** When set, the class select is hidden and the student joins this class. */
+  fixedClassId?: string;
+}) {
   const { dispatch } = useStore();
   const classes = visibleClasses(account, REFERENCE.CLASSES);
   const [name, setName] = useState('');
@@ -23,7 +30,8 @@ function CreateStudentForm({ account }: { account: Account }) {
   const [created, setCreated] = useState<string | null>(null);
 
   if (!canDo(account, 'createStudentAccount') || classes.length === 0) return null;
-  const cls = REFERENCE.CLASSES.find((c) => c.id === classId);
+  const effectiveClassId = fixedClassId ?? classId;
+  const cls = REFERENCE.CLASSES.find((c) => c.id === effectiveClassId);
 
   return (
     <div className="form-card">
@@ -33,21 +41,23 @@ function CreateStudentForm({ account }: { account: Account }) {
           <span>Tên học sinh</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ví dụ: Lan" />
         </label>
-        <label className="field">
-          <span>Lớp</span>
-          <select value={classId} onChange={(e) => setClassId(e.target.value)}>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {fixedClassId ? null : (
+          <label className="field">
+            <span>Lớp</span>
+            <select value={classId} onChange={(e) => setClassId(e.target.value)}>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
       <button
         type="button"
         className="btn btn-primary"
-        disabled={name.trim() === '' || classId === ''}
+        disabled={name.trim() === '' || effectiveClassId === ''}
         onClick={() => {
           const id = `u-${Date.now()}`;
           dispatch({
@@ -58,7 +68,7 @@ function CreateStudentForm({ account }: { account: Account }) {
               role: 'student',
               schoolId: cls?.schoolId ?? account.schoolId,
               teamId: null,
-              classIds: [classId],
+              classIds: [effectiveClassId],
               demoLogin: true,
               initials: initialsOf(name.trim()),
             },
@@ -188,7 +198,7 @@ export function SettingsView({ account }: { account: Account }) {
   const [confirming, setConfirming] = useState(false);
   return (
     <div>
-      <SectionBand title="Cài đặt" guide="Thông tin về bản demo này." />
+      <SectionBand title="Giới thiệu & dữ liệu demo" guide="Thông tin về bản demo này." />
       <div className="form-card">
         <h3 className="subhead">Về bản demo</h3>
         <p>

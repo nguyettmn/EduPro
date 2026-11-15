@@ -54,10 +54,22 @@ thái đang chọn trong điều hướng.
 - Admin: Quản trị hệ thống — xem cả hai trường.
 - Hiệu trưởng: Cô Hiệu trưởng Lan — Trường Tiểu học An Bình.
 - Tổ trưởng: Thầy Tổ trưởng Toán — Tổ Toán 5.
-- Giáo viên: Cô Mai (Toán 5, Lớp 5A) và Thầy Hùng (Toán 6, Lớp 6B, tổ khác).
-- Học sinh Lớp 5A: An, Bình, Chi. Học sinh Lớp 6B: Dũng.
+- Giáo viên: Cô Mai (Toán 5, Lớp 5A và Lớp 5B) và Thầy Hùng (Toán 6, Lớp 6B, tổ khác).
+- Học sinh Lớp 5A: An, Bình, Chi. Học sinh Lớp 5B: Phương, Tuấn. Học sinh Lớp 6B: Dũng.
 - Trường Tiểu học Bình Minh có dữ liệu tối thiểu để Admin thấy quản lý nhiều
   trường.
+
+## Điều hướng (theo quy trình làm việc)
+
+- Giáo viên: Trang chính (“Hôm nay”), Lớp học, Soạn bài, Kho chung, Giới
+  thiệu. Trang chính liệt kê mọi việc cần xử lý, mỗi việc đều bấm vào được.
+  Lớp học là nơi xem học sinh, bài giao và chấm bài kèm đáp án của học sinh.
+  Soạn bài là một không gian duy nhất: bài của tôi, Pack, và bài trong phạm
+  vi quản lý; giao bài ngay từ bài học, cho cả lớp hoặc từng học sinh.
+- Tổ trưởng, Hiệu trưởng, Admin: thêm mục Quản lý.
+- Học sinh: Trang chính, Space (tên lớp học của em, em tự đổi tên riêng),
+  Tutor Space, Giới thiệu. Bài giao nằm trong Space; bài giao riêng chỉ hiện
+  với học sinh được giao.
 
 ## Nội dung mẫu: Pack Toán 5 – Phân số
 

@@ -41,6 +41,8 @@ export interface AppState {
   proposals: Proposal[];
   repoItems: RepoItem[];
   tutor: Record<string, TutorData>;
+  /** Personal Space renames, keyed by student id. */
+  spaceNames: Record<string, string>;
   /** Admin school filter (null = all schools). */
   schoolFilter: string | null;
 }
@@ -59,6 +61,7 @@ export function buildInitialState(): AppState {
     proposals: clone(PROPOSALS),
     repoItems: clone(REPO_ITEMS),
     tutor: clone(TUTOR_DATA),
+    spaceNames: {},
     schoolFilter: null,
   };
 }
@@ -83,6 +86,7 @@ export type Action =
   | { type: 'CREATE_LESSON_COPY'; lesson: Lesson }
   | { type: 'DELETE_LESSON_COPY'; lessonId: string }
   | { type: 'SET_SCHOOL_FILTER'; schoolId: string | null }
+  | { type: 'RENAME_SPACE'; studentId: string; name: string }
   | { type: 'RESET_DEMO' };
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -228,6 +232,11 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, lessons: state.lessons.filter((l) => l.id !== action.lessonId) };
     case 'SET_SCHOOL_FILTER':
       return { ...state, schoolFilter: action.schoolId };
+    case 'RENAME_SPACE':
+      return {
+        ...state,
+        spaceNames: { ...state.spaceNames, [action.studentId]: action.name.trim() },
+      };
     case 'RESET_DEMO':
       return { ...buildInitialState(), currentAccountId: state.currentAccountId };
     default:

@@ -1,8 +1,12 @@
 // Role dashboards. Every number comes from live demo state, and every list
 // is scoped through the permission table (never hardcoded by role).
-import type { Account } from '../types';
+// The teacher dashboard is "Hôm nay": an attention list where EVERY item
+// is a button into the workflow, plus a per-class summary.
+import { useState } from 'react';
+import type { Account, ClassGroup } from '../types';
 import { ROLE_META } from '../types';
 import {
+  assignmentVisibleToStudent,
   canDecideProposal,
   canViewTutorSummary,
   managedAccounts,
@@ -13,7 +17,7 @@ import {
 import { REFERENCE, useStore } from '../state/store';
 import type { Route } from '../route';
 import { RoleBadge } from './RoleBadge';
-import { dueLabel, EmptyState, SectionBand, StatCard, formatDate } from './ui';
+import { daysUntil, dueLabel, EmptyState, SectionBand, StatCard, formatDate, todayLabel } from './ui';
 
 function className(classId: string): string {
   return REFERENCE.CLASSES.find((c) => c.id === classId)?.name ?? classId;
@@ -34,7 +38,10 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
   const students = visibleStudents(account, state.accounts);
   const teachers = visibleTeachers(account, state.accounts);
   const classes = visibleClasses(account, REFERENCE.CLASSES);
-  const myAssignments = state.assignments.filter((a) => classes.some((c) => c.id === a.classId));
+  const isStudent = account.role === 'student';
+  const myAssignments = isStudent
+    ? state.assignments.filter((a) => assignmentVisibleToStudent(a, account))
+    : state.assignments.filter((a) => classes.some((c) => c.id === a.classId));
   const pendingForMe = state.proposals.filter(
     (p) => p.status === 'pending' && canDecideProposal(account, p, state.accounts),
   );
@@ -55,14 +62,71 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
     return t.weakTopics.map(topicTitle).join(', ');
   };
 
+  const isTeacher = account.role === 'teacher';
+  const unreviewed = state.submissions.filter(
+    (s) => myAssignments.some((a) => a.id === s.assignmentId) && !s.reviewed,
+  );
+
+  // Teacher attention list, in workflow order: grade, due work, silent
+  // students, then proposals. Every item navigates into Lớp học / Kho chung.
+  const attention: { key: string; label: string; route: Route }[] = [];
+  if (isTeacher) {
+    for (const s of unreviewed) {
+      const assignment = state.assignments.find((a) => a.id === s.assignmentId);
+      if (!assignment) continue;
+      attention.push({
+        key: `grade-${s.id}`,
+        label: `Chấm bài của ${accountName(state.accounts, s.studentId)} — ${s.score} trên ${s.total}`,
+        route: { view: 'classes', assignmentId: s.assignmentId, classId: assignment.classId },
+      });
+    }
+    for (const a of myAssignments.filter((x) => x.status === 'active' && daysUntil(x.dueDate) <= 0)) {
+      const expected =
+        a.studentIds && a.studentIds.length > 0
+          ? students.filter((st) => a.studentIds?.includes(st.id))
+          : students.filter((st) => st.classIds.includes(a.classId));
+      const missing = expected.filter(
+        (st) => !state.submissions.some((s) => s.assignmentId === a.id && s.studentId === st.id),
+      );
+      if (missing.length === 0) continue;
+      attention.push({
+        key: `due-${a.id}`,
+        label: `${dueLabel(a.dueDate)}: ${a.title} — ${missing.length} em chưa nộp`,
+        route: { view: 'classes', classId: a.classId, assignmentId: a.id },
+      });
+    }
+    for (const st of students) {
+      const hasVisible = myAssignments.some((a) => assignmentVisibleToStudent(a, st));
+      const hasSubmission = state.submissions.some(
+        (s) => s.studentId === st.id && myAssignments.some((a) => a.id === s.assignmentId),
+      );
+      if (hasVisible && !hasSubmission) {
+        attention.push({
+          key: `none-${st.id}`,
+          label: `${st.name} chưa nộp bài nào`,
+          route: { view: 'classes', classId: st.classIds[0] },
+        });
+      }
+    }
+    for (const p of pendingForMe) {
+      attention.push({
+        key: `prop-${p.id}`,
+        label: `Duyệt đề xuất: ${p.title}`,
+        route: { view: 'repo' },
+      });
+    }
+  }
+
   return (
     <div>
       <SectionBand
-        title={`Xin chào, ${account.name}`}
+        title={isTeacher ? 'Hôm nay' : `Xin chào, ${account.name}`}
         guide={
-          account.role === 'student'
-            ? 'Việc cần làm hôm nay ở bên dưới. Bấm vào bài để làm.'
-            : 'Tổng quan trong phạm vi bạn quản lý. Mọi con số đều từ dữ liệu demo.'
+          isTeacher
+            ? todayLabel()
+            : account.role === 'student'
+              ? 'Việc cần làm hôm nay ở bên dưới. Bấm vào bài để làm.'
+              : 'Tổng quan trong phạm vi bạn quản lý. Mọi con số đều từ dữ liệu demo.'
         }
         color={meta.color}
       />
@@ -153,6 +217,7 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
             students={students}
             studentStats={studentStats}
             weakTopicsLabel={weakTopicsLabel}
+            classes={classes}
             go={go}
           />
         </>
@@ -189,64 +254,80 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
         </>
       ) : null}
 
-      {account.role === 'teacher' ? (
+      {isTeacher ? (
         <>
           <div className="stat-grid">
-            <StatCard label="Học sinh" value={String(students.length)} color={meta.color} />
+            <StatCard
+              label="Học sinh"
+              value={String(students.length)}
+              color={meta.color}
+              onClick={() => go({ view: 'classes' })}
+            />
             <StatCard
               label="Bài chờ chấm"
-              value={String(
-                state.submissions.filter(
-                  (s) =>
-                    myAssignments.some((a) => a.id === s.assignmentId) && !s.reviewed,
-                ).length,
-              )}
+              value={String(unreviewed.length)}
               color={meta.color}
+              onClick={() => go({ view: 'classes' })}
             />
-            <StatCard label="Đề xuất chờ bạn duyệt" value={String(pendingForMe.length)} color={meta.color} />
+            <StatCard
+              label="Đề xuất chờ bạn duyệt"
+              value={String(pendingForMe.length)}
+              color={meta.color}
+              onClick={() => go({ view: 'repo' })}
+            />
           </div>
-          <h3 className="subhead">Việc cần làm</h3>
-          <div className="todo-list">
-            {state.submissions
-              .filter((s) => myAssignments.some((a) => a.id === s.assignmentId) && !s.reviewed)
-              .map((s) => (
+          <h3 className="subhead">Cần xử lý hôm nay</h3>
+          {attention.length === 0 ? (
+            <p className="guide-text">Hôm nay không có việc gì cần xử lý.</p>
+          ) : (
+            <div className="todo-list">
+              {attention.map((item) => (
                 <button
-                  key={s.id}
+                  key={item.key}
                   type="button"
                   className="todo-row"
-                  onClick={() => go({ view: 'assignments', assignmentId: s.assignmentId })}
+                  onClick={() => go(item.route)}
                 >
-                  Chấm bài của {accountName(state.accounts, s.studentId)} — {s.score} trên {s.total} câu đúng
+                  <span>{item.label}</span>
+                  <span className="status-todo">Mở →</span>
                 </button>
               ))}
-            {pendingForMe.map((p) => (
-              <button key={p.id} type="button" className="todo-row" onClick={() => go({ view: 'repo' })}>
-                Duyệt đề xuất: {p.title} (của {p.anonymous ? 'Ẩn danh' : p.createdByName})
-              </button>
-            ))}
-            {students
-              .filter(
-                (st) =>
-                  !state.submissions.some(
-                    (s) => s.studentId === st.id && myAssignments.some((a) => a.id === s.assignmentId),
-                  ),
-              )
-              .map((st) => (
-                <div key={st.id} className="todo-row todo-muted">
-                  {st.name} chưa nộp bài nào
-                </div>
-              ))}
-          </div>
-          <StudentProgressTable
-            students={students}
-            studentStats={studentStats}
-            weakTopicsLabel={weakTopicsLabel}
-            go={go}
-          />
+            </div>
+          )}
+          <h3 className="subhead">Lớp của tôi</h3>
+          {classes.length === 0 ? (
+            <EmptyState text="Bạn chưa quản lý lớp nào. Quản trị viên sẽ gán lớp cho bạn." />
+          ) : (
+            <div className="todo-list">
+              {classes.map((c) => {
+                const classStudents = students.filter((s) => s.classIds.includes(c.id));
+                const active = myAssignments.filter((a) => a.classId === c.id && a.status === 'active').length;
+                const waiting = unreviewed.filter((s) => {
+                  const a = state.assignments.find((x) => x.id === s.assignmentId);
+                  return a?.classId === c.id;
+                }).length;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="todo-row"
+                    onClick={() => go({ view: 'classes', classId: c.id })}
+                  >
+                    <span>
+                      <strong>{c.name}</strong> · {classStudents.length} học sinh · {active} bài đang giao
+                    </span>
+                    <span className={waiting > 0 ? 'status-todo' : 'status-done'}>
+                      {waiting > 0 ? `${waiting} bài chờ chấm` : 'Đã chấm xong'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </>
       ) : null}
 
-      {account.role === 'student' ? (
+      {isStudent ? (
         <>
           <div className="stat-grid">
             <StatCard
@@ -289,11 +370,11 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
             </div>
           )}
           <div className="row-actions">
-            <button type="button" className="btn btn-primary" onClick={() => go({ view: 'tutor' })}>
-              Vào Tutor Space của tôi
+            <button type="button" className="btn btn-primary" onClick={() => go({ view: 'assignments' })}>
+              Vào Space của tôi
             </button>
-            <button type="button" className="btn btn-secondary" onClick={() => go({ view: 'library' })}>
-              Vào Thư viện
+            <button type="button" className="btn btn-secondary" onClick={() => go({ view: 'tutor' })}>
+              Vào Tutor Space của tôi
             </button>
           </div>
           <p className="guide-text">
@@ -317,17 +398,32 @@ function StudentProgressTable({
   students,
   studentStats,
   weakTopicsLabel,
+  classes,
   go,
 }: {
   students: Account[];
   studentStats: (studentId: string) => { submitted: number; avg: number | null };
   weakTopicsLabel: (student: Account) => string;
+  classes: ClassGroup[];
   go: (route: Route) => void;
 }) {
+  const [classFilter, setClassFilter] = useState('');
+  const visible = classFilter === '' ? students : students.filter((s) => s.classIds.includes(classFilter));
   return (
     <>
       <h3 className="subhead">Tiến độ học sinh</h3>
-      {students.length === 0 ? (
+      <label className="field field-inline">
+        <span>Lọc theo lớp</span>
+        <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
+          <option value="">Tất cả các lớp</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {visible.length === 0 ? (
         <EmptyState text="Chưa có học sinh nào trong phạm vi của bạn." />
       ) : (
         <div className="table-wrap">
@@ -343,7 +439,7 @@ function StudentProgressTable({
               </tr>
             </thead>
             <tbody>
-              {students.map((st) => {
+              {visible.map((st) => {
                 const stats = studentStats(st.id);
                 return (
                   <tr key={st.id}>

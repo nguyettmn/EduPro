@@ -20,12 +20,34 @@ const THEME_LABEL: Record<GameDef['theme'], string> = {
   forest: 'Rừng xanh',
 };
 
-function TutorSummary({ student, viewer }: { student: Account; viewer: Account }) {
+function TutorSummary({
+  student,
+  viewer,
+  route,
+  go,
+}: {
+  student: Account;
+  viewer: Account;
+  route: Route;
+  go: (route: Route) => void;
+}) {
   const { state } = useStore();
   const tutor = state.tutor[student.id];
   const topics = REFERENCE.PACK.topics;
   return (
     <div>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        onClick={() =>
+          go({
+            view: route.from ?? 'dashboard',
+            ...(route.from === 'classes' && route.classId ? { classId: route.classId } : {}),
+          })
+        }
+      >
+        ← Quay lại
+      </button>
       <SectionBand
         title={`Tóm tắt Tutor Space của ${student.name}`}
         guide="Bạn chỉ thấy tóm tắt chung. Nội dung bên trong Tutor Space là riêng tư, kể cả với người quản lý."
@@ -94,7 +116,7 @@ export function TutorSpace({
     if (!canViewTutorSummary(account, student, state.accounts)) {
       return <EmptyState text="Bạn không có quyền xem Tutor Space của học sinh này." />;
     }
-    return <TutorSummary student={student} viewer={account} />;
+    return <TutorSummary student={student} viewer={account} route={route} go={go} />;
   }
 
   const tutor = state.tutor[studentId] ?? {

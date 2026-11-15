@@ -9,6 +9,7 @@
 // someone else's original: edits happen on a copy.
 import type {
   Account,
+  Assignment,
   ClassGroup,
   NavItem,
   Proposal,
@@ -30,11 +31,11 @@ export type Action =
   | 'reviewStudentProposal';
 
 const ROLE_VIEWS: Record<Role, ViewId[]> = {
-  admin: ['dashboard', 'library', 'lesson', 'studio', 'assignments', 'repo', 'manage', 'settings'],
-  principal: ['dashboard', 'library', 'lesson', 'studio', 'assignments', 'repo', 'manage', 'settings'],
-  lead: ['dashboard', 'library', 'lesson', 'studio', 'assignments', 'repo', 'manage', 'settings'],
-  teacher: ['dashboard', 'library', 'lesson', 'studio', 'assignments', 'repo', 'manage', 'settings'],
-  student: ['dashboard', 'library', 'lesson', 'assignments', 'tutor', 'settings'],
+  admin: ['dashboard', 'classes', 'lesson', 'studio', 'repo', 'manage', 'settings'],
+  principal: ['dashboard', 'classes', 'lesson', 'studio', 'repo', 'manage', 'settings'],
+  lead: ['dashboard', 'classes', 'lesson', 'studio', 'repo', 'manage', 'settings'],
+  teacher: ['dashboard', 'classes', 'lesson', 'studio', 'repo', 'settings'],
+  student: ['dashboard', 'lesson', 'assignments', 'tutor', 'settings'],
 };
 
 const ROLE_ACTIONS: Record<Role, Action[]> = {
@@ -47,21 +48,25 @@ const ROLE_ACTIONS: Record<Role, Action[]> = {
 
 const NAV_LABELS: Record<ViewId, string> = {
   dashboard: 'Trang chính',
-  library: 'Thư viện',
+  classes: 'Lớp học',
   lesson: 'Bài học',
   studio: 'Soạn bài',
-  assignments: 'Giao bài',
+  assignments: 'Space',
   repo: 'Kho chung',
   tutor: 'Tutor Space',
   manage: 'Quản lý',
-  settings: 'Cài đặt',
+  settings: 'Giới thiệu',
 };
 
-export function getNavItems(role: Role): NavItem[] {
-  // The lesson view is reached from the library, not from top-level nav.
-  return ROLE_VIEWS[role]
+export function getNavItems(account: Account, spaceName?: string): NavItem[] {
+  // The lesson view is reached from Soạn bài / Space, not from top-level nav.
+  // Students see their Space under its own (possibly renamed) name.
+  return ROLE_VIEWS[account.role]
     .filter((v) => v !== 'lesson')
-    .map((view) => ({ view, label: NAV_LABELS[view] }));
+    .map((view) => ({
+      view,
+      label: view === 'assignments' && spaceName ? spaceName : NAV_LABELS[view],
+    }));
 }
 
 export function canView(role: Role, view: ViewId): boolean {
@@ -132,6 +137,35 @@ export function visibleClasses(
     case 'student':
       return classes.filter((c) => viewer.classIds.includes(c.id));
   }
+}
+
+/** Whether a student sees and may do an assignment.
+ * Whole-class assignments reach every student of the class; an assignment
+ * with studentIds reaches only the listed students. */
+export function assignmentVisibleToStudent(
+  assignment: Assignment,
+  student: Account,
+): boolean {
+  if (!student.classIds.includes(assignment.classId)) return false;
+  if (assignment.studentIds && assignment.studentIds.length > 0) {
+    return assignment.studentIds.includes(student.id);
+  }
+  return true;
+}
+
+/** A student's Space name: their own rename if set, else the class-based
+ * default, else a generic name when the student has no class. The rename is
+ * personal: it changes only this student's own Space label. */
+export function spaceNameFor(
+  student: Account,
+  classes: ClassGroup[],
+  spaceNames: Record<string, string>,
+): string {
+  const custom = spaceNames[student.id]?.trim();
+  if (custom) return custom;
+  const firstClass = classes.find((c) => student.classIds.includes(c.id));
+  if (firstClass) return `Không gian học tập ${firstClass.name}`;
+  return 'Không gian học tập của em';
 }
 
 /** Tutor Space contents are visible ONLY to the owning student. */

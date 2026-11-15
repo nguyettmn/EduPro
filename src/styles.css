@@ -315,6 +315,26 @@ button.todo-row:hover { border-color: var(--role-color); }
 .chat-form { display: flex; gap: 10px; }
 .chat-form input { flex: 1; }
 
+/* ---------- Rebuild additions: notices, studio cards, answer review ---------- */
+.notice {
+  background: var(--ok-bg); border: 1.5px solid #bbf7d0; color: var(--ok);
+  border-radius: 10px; padding: 10px 14px; font-weight: 700; margin: 0 0 14px;
+}
+.stat-card-btn { text-align: left; width: 100%; font: inherit; color: inherit; }
+.stat-card-btn:hover { border-color: var(--role-color); }
+.studio-card {
+  background: #fff; border: 1.5px solid var(--line); border-radius: 10px;
+  padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+}
+.studio-card-active { border-color: var(--role-color); background: var(--role-tint); }
+.studio-card-main {
+  background: none; border: none; padding: 0; text-align: left;
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+}
+.check-list { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
+.answer-pair { display: flex; gap: 18px; flex-wrap: wrap; align-items: baseline; margin-top: 8px; }
+.answer-pair .feedback-ok, .answer-pair .feedback-bad { margin-top: 0; }
+
 /* ---------- Responsive basics ---------- */
 @media (max-width: 900px) {
   .shell-body { flex-direction: column; }

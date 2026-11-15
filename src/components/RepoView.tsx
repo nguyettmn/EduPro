@@ -39,6 +39,7 @@ export function RepoView({ account }: { account: Account }) {
   const [reasonDrafts, setReasonDrafts] = useState<Record<string, string>>({});
   const [proposeCopyId, setProposeCopyId] = useState('');
   const [proposeTarget, setProposeTarget] = useState<'team' | 'school'>('team');
+  const [notice, setNotice] = useState<string | null>(null);
 
   const schoolFilter = canDo(account, 'manageSystem') ? state.schoolFilter : account.schoolId;
   const inSchool = (schoolId: string) => !schoolFilter || schoolFilter === schoolId;
@@ -53,6 +54,7 @@ export function RepoView({ account }: { account: Account }) {
     (item) => item.repo === 'school' && inSchool(item.schoolId),
   );
   const queue = state.proposals.filter((p) => p.status === 'pending' && inSchool(p.schoolId));
+  const awaitingMe = queue.filter((p) => canDecideProposal(account, p, state.accounts));
   const mine = state.proposals.filter((p) => p.createdBy === account.id);
   const myCopies = state.lessons.filter((l) => l.ownerId === account.id);
 
@@ -88,6 +90,35 @@ export function RepoView({ account }: { account: Account }) {
       nextStage: next,
     });
     setRejectFor(null);
+    setNotice(
+      decision === 'approved'
+        ? `Đã duyệt đề xuất: ${proposal.title}.`
+        : `Đã từ chối đề xuất: ${proposal.title}.`,
+    );
+  };
+
+  /** Who must act next on a pending proposal, by name when known. */
+  const nextApproverName = (proposal: Proposal): string => {
+    if (proposal.stage === 'teacher') {
+      const proposer = state.accounts.find((a) => a.id === proposal.createdBy);
+      const teacher = state.accounts.find(
+        (a) => a.role === 'teacher' && proposer?.classIds.some((c) => a.classIds.includes(c)),
+      );
+      return teacher?.name ?? 'Giáo viên';
+    }
+    if (proposal.stage === 'team') {
+      const lead = state.accounts.find(
+        (a) => a.role === 'lead' && a.teamId === proposal.teamId && a.schoolId === proposal.schoolId,
+      );
+      return lead?.name ?? 'Tổ trưởng';
+    }
+    if (proposal.stage === 'school') {
+      const principal = state.accounts.find(
+        (a) => a.role === 'principal' && a.schoolId === proposal.schoolId,
+      );
+      return principal?.name ?? 'Hiệu trưởng';
+    }
+    return '';
   };
 
   const copyLesson = (item: RepoItem) => {
@@ -101,6 +132,7 @@ export function RepoView({ account }: { account: Account }) {
       sourceId: source.id,
     };
     dispatch({ type: 'COPY_TO_MY_SPACE', lesson: copy });
+    setNotice('Đã copy bài về không gian của bạn.');
   };
 
   const renderItem = (item: RepoItem) => {
@@ -156,15 +188,24 @@ export function RepoView({ account }: { account: Account }) {
     const topic = topicOf(proposal.topicId);
     const canDecide = canDecideProposal(account, proposal, state.accounts);
     const proposer = state.accounts.find((a) => a.id === proposal.createdBy);
+    const expanded = expandedId === proposal.id;
+    const lesson = proposal.lessonCopyId
+      ? state.lessons.find((l) => l.id === proposal.lessonCopyId)
+      : undefined;
+    const questions = QUESTIONS.filter((q) => (proposal.questionIds ?? []).includes(q.id));
     return (
       <div key={proposal.id} className="repo-item">
-        <div className="repo-item-head">
+        <button
+          type="button"
+          className="repo-item-head"
+          onClick={() => setExpandedId(expanded ? null : proposal.id)}
+        >
           <span>
             <strong>{proposal.title}</strong> · {KIND_LABEL[proposal.kind]} →{' '}
             {proposal.targetRepo === 'team' ? 'Kho Tổ' : 'Kho Trường'}
           </span>
           <span className="muted">{STAGE_LABEL[proposal.stage]}</span>
-        </div>
+        </button>
         <div className="tag-row">
           {topic ? <TopicTag topic={topic} /> : null}
           {proposer ? <RoleDot role={proposer.role} /> : null}
@@ -172,6 +213,20 @@ export function RepoView({ account }: { account: Account }) {
             Người gửi: {displayOwnerName(proposal.anonymous, proposal.createdByName)}
           </span>
         </div>
+        {expanded ? (
+          <div className="repo-item-body">
+            {proposal.kind === 'lesson' && lesson ? <LessonPlayer lesson={lesson} /> : null}
+            {proposal.kind === 'game' && proposal.game ? <GameView game={proposal.game} /> : null}
+            {proposal.kind === 'questions' ? (
+              <QuizRunner
+                questions={questions}
+                mode="practice"
+                accentColor={topic?.color ?? '#2563eb'}
+                title={`Luyện tập: ${proposal.title}`}
+              />
+            ) : null}
+          </div>
+        ) : null}
         {proposal.status === 'rejected' && proposal.reason ? (
           <p className="comment-box">Lý do từ chối: {proposal.reason}</p>
         ) : null}
@@ -186,7 +241,10 @@ export function RepoView({ account }: { account: Account }) {
           </div>
         ) : null}
         {proposal.status === 'pending' && !canDecide ? (
-          <p className="guide-text">Đề xuất này đang chờ người duyệt ở bước tiếp theo.</p>
+          <p className="guide-text">
+            Tiếp theo: {nextApproverName(proposal)} duyệt cho{' '}
+            {proposal.targetRepo === 'team' ? 'Kho Tổ' : 'Kho Trường'}.
+          </p>
         ) : null}
         {rejectFor === proposal.id ? (
           <div className="form-card">
@@ -223,6 +281,7 @@ export function RepoView({ account }: { account: Account }) {
         title="Kho chung"
         guide="Nội dung đã duyệt nằm ở Kho Tổ và Kho Trường. Bản gốc thuộc về người tạo, muốn sửa thì copy về không gian của mình."
       />
+      {notice ? <p className="notice">{notice}</p> : null}
       <div className="tabs" role="tablist">
         <button type="button" className={tab === 'team' ? 'tab tab-active' : 'tab'} onClick={() => setTab('team')}>
           Kho Tổ
@@ -231,7 +290,7 @@ export function RepoView({ account }: { account: Account }) {
           Kho Trường
         </button>
         <button type="button" className={tab === 'queue' ? 'tab tab-active' : 'tab'} onClick={() => setTab('queue')}>
-          Chờ duyệt ({queue.length})
+          Chờ duyệt ({awaitingMe.length})
         </button>
         <button type="button" className={tab === 'mine' ? 'tab tab-active' : 'tab'} onClick={() => setTab('mine')}>
           Đề xuất của tôi
