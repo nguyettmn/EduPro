@@ -122,6 +122,36 @@ file JSON, “Nhập file bài học” nhận cả hai loại file. File HTML n
 hiển thị trong iframe sandbox, và file chứa script tải từ bên ngoài sẽ bị từ
 chối.
 
+## Tạo game bằng AI (bản test)
+
+Mỗi bài học đều có mục “Trò chơi” ở cuối bài (cả bài thường lẫn bài HTML),
+và Tutor Space của học sinh cũng có mục game riêng. Một bài có thể có nhiều
+game. Giáo viên bấm “Tạo game bằng AI” để mở studio tạo game: chọn khối/môn,
+chủ đề, loại game (Snake, Pac-Man, Runner, Defender, Adventure, hoặc để AI
+đề xuất — chọn loại là có sẵn bộ luật mẫu + cách tính điểm), theme, nguồn
+câu hỏi (nội dung bài học, dàn ý, tài liệu). AI đề xuất “Thẻ game” (luật,
+điểm, kế hoạch câu hỏi) để duyệt trước, rồi sinh game thành một file HTML
+duy nhất, tự chứa hoàn toàn. Sửa game bằng chat theo 5 chế độ (chỉnh số, đổi
+theme, đổi luật, câu hỏi mới, làm lại) — AI chỉ đổi đúng phần đó. Game đã
+lưu có nút Sửa để mở lại trong studio.
+
+Game cũng tải lên được: file JSON dạng bản ghi cũ (`{id, title, mechanic,
+theme, htmlCode, createdAt}` hoặc `{lessonId, htmlCode}`) hoặc file HTML
+thô. File game cũ dùng Tailwind CDN + Google Fonts vẫn chơi được (kèm cảnh
+báo cần mạng); script ngoài khác đều bị từ chối.
+
+Game chơi trong iframe sandbox và báo kết quả về app qua giao thức
+`EDUPRO_GAME_RESULT` (postMessage): điểm, sao, đúng/sai theo từng kỹ năng.
+Kết quả cập nhật chủ đề yếu theo cùng luật với nộp bài, và hiện tóm tắt
+dưới khung chơi. Mọi lượt chơi đều gieo hạt bằng mã thử thách (seed) nên
+cùng một mã thì lượt chơi giống hệt nhau — thi đấu công bằng.
+
+Prompt tạo game cũng hai lớp và đa môn (toán sinh câu hỏi bằng code, môn
+khác dùng ngân hàng câu hỏi liệt kê đủ trong Thẻ game để duyệt). Các stage
+`game-propose` (JSON), `game-generate` và `game-revise` (SSE) nằm chung
+trong `api/ai-soan-bai.ts`, kèm kiểm tra hợp đồng output (game bắt buộc
+phải gửi `EDUPRO_GAME_RESULT`).
+
 Cấu hình (Vercel → project → Settings → Environment Variables, rồi deploy
 lại):
 
@@ -139,9 +169,10 @@ chưa tính vào điểm nộp bài.
 ```text
 api/
   ai-soan-bai.ts      Vercel function tự chứa toàn bộ: lắp prompt hai lớp,
-                      gọi Gemini (SSE cho soạn bài, JSON cho lên chương
-                      trình và tạo bài tập), trích văn bản DOCX/TXT,
-                      kiểm tra hợp đồng output; không import file nội bộ
+                      gọi Gemini (SSE cho soạn bài và tạo game, JSON cho
+                      lên chương trình, tạo bài tập và Thẻ game), trích
+                      văn bản DOCX/TXT, kiểm tra hợp đồng output; không
+                      import file nội bộ
 src/
   types.ts            Kiểu dữ liệu chung
   permissions.ts      Bảng quyền trung tâm + hàm xác định phạm vi
@@ -153,8 +184,10 @@ src/
                       function phải giữ đồng bộ với file này)
     client.ts         Client gọi API AI (đọc luồng SSE + gọi JSON)
     lessonFile.ts     Xuất/nhập file bài học: HTML kèm JSON nguồn, JSON Môn
+    gameFile.ts       Xuất/nhập file game: JSON bản ghi cũ hoặc HTML thô
   data/
     questions.ts      Ngân hàng câu hỏi (được tạo ra, đáp án đã tính sẵn)
+    sampleGame.ts     Game HTML mẫu để thử các luồng game không cần API key
     seed.ts           Tài khoản, trường, lớp, bài học, bài giao, đề xuất mẫu
   state/store.tsx     Context + reducer cho toàn bộ trạng thái demo
   components/         Giao diện theo từng màn hình và từng khối chức năng
@@ -168,6 +201,8 @@ src/
   sao, thêm, xóa và sắp xếp lại các phần. Bản thiết kế lại đầy đủ sẽ đến sau.
 - Chat AI trong Tutor Space trả lời bằng gợi ý có sẵn theo từ khóa, không gọi
   API nào. Với bài được giao, gia sư chỉ gợi ý, không cho đáp án trực tiếp.
-- Game hiện có một cơ chế chơi được: đố nhanh tính giờ, từ ngân hàng câu hỏi.
+- Game hiện có hai dạng: đố nhanh tính giờ từ ngân hàng câu hỏi (khung cũ),
+  và game HTML một file (AI tạo hoặc tải lên) gắn vào bài học hoặc Tutor
+  Space. Game HTML chưa gửi lên Kho chung được trong bản test.
 - Bài HTML do AI soạn chưa chấm điểm và chưa gửi lên Kho chung được trong
   bản test.

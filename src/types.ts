@@ -222,6 +222,58 @@ export interface GameDef {
   anonymous: boolean;
 }
 
+// ---------- HTML games (AI-generated / uploaded single-file games) ----------
+// Distinct from GameDef (the frame-v1 quick-quiz built from the question
+// bank). An HtmlGame is one self-contained HTML file — the same record
+// shape as the user's old Gemini game files ({id, title, mechanic,
+// theme, htmlCode, createdAt}), so those files import directly. A game
+// is attached to a lesson (lessonId set, one lesson can have many
+// games) or standalone in a student's Tutor Space (no lessonId).
+
+export interface HtmlGame {
+  id: string;
+  title: string;
+  /** Free text, e.g. "Snake Game", "Pacman Maze", "Imported". */
+  mechanic: string;
+  theme: string;
+  htmlCode: string;
+  ownerId: string;
+  lessonId?: string;
+  /** Challenge code (seed) for the run; shown inside the game. */
+  seed?: string;
+  createdAt: string;
+  /** Generation inputs, kept so the game can be reopened in the studio. */
+  grade?: number;
+  subject?: string;
+  topic?: string;
+  /** True when the file came from an old CDN-based game: needs internet. */
+  needsInternet?: boolean;
+}
+
+export interface GameSkillResult {
+  skill: string;
+  correct: number;
+  wrong: number;
+}
+
+/** One finished run of an HTML game, reported by the game itself via the
+ * EDUPRO_GAME_RESULT postMessage protocol. Feeds the weak-topic system
+ * the same way a submission does. */
+export interface GameResult {
+  id: string;
+  gameId: string;
+  studentId: string;
+  won: boolean;
+  score: number;
+  stars: number;
+  durationSec: number;
+  correct: number;
+  wrong: number;
+  skills: GameSkillResult[];
+  missedSkills: string[];
+  playedAt: string;
+}
+
 export interface Proposal {
   id: string;
   kind: RepoKind;
@@ -335,7 +387,8 @@ export type ViewId =
   | 'managed'
   | 'tutor'
   | 'manage'
-  | 'settings';
+  | 'settings'
+  | 'gamestudio';
 
 export interface NavItem {
   view: ViewId;

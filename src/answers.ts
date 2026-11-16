@@ -136,3 +136,39 @@ export function updateWeakTopics(
   }
   return ordered;
 }
+
+function normSkill(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Map a game's per-skill results onto Pack topics so a finished game run
+ * refreshes weak topics with the same rule as a submission. A skill
+ * matches a topic when one name contains the other (the game reports
+ * free-text skill names from the lesson's topic labels). Unmatched
+ * skills are ignored: a game must never invent weak topics.
+ */
+export function topicResultsFromGameSkills(
+  skills: { skill: string; correct: number; wrong: number }[],
+  topics: { id: string; title: string }[],
+): TopicResult[] {
+  const byTopic = new Map<string, { correct: number; total: number }>();
+  for (const s of skills) {
+    const name = normSkill(s.skill);
+    if (name === '') continue;
+    const topic = topics.find((t) => {
+      const title = normSkill(t.title);
+      return title !== '' && (name.includes(title) || title.includes(name));
+    });
+    if (!topic) continue;
+    const entry = byTopic.get(topic.id) ?? { correct: 0, total: 0 };
+    entry.correct += s.correct;
+    entry.total += s.correct + s.wrong;
+    byTopic.set(topic.id, entry);
+  }
+  return [...byTopic.entries()].map(([topicId, { correct, total }]) => ({
+    topicId,
+    correct,
+    total,
+  }));
+}

@@ -21,6 +21,7 @@ import { HtmlLessonPlayer } from './HtmlLessonPlayer';
 import { AiStudio } from './AiStudio';
 import { BatchPlanner, type BatchItem } from './BatchPlanner';
 import { LessonExerciseSection } from './ExerciseStudio';
+import { LessonGamesSection } from './LessonGamesSection';
 import { EmptyState, SectionBand } from './ui';
 
 const BLANK_SECTION = (id: string): LessonSection => ({
@@ -1013,6 +1014,9 @@ export function StudioShell({
                 </div>
               </>
             )}
+            {!assignLesson && draft ? (
+              <LessonGamesSection account={account} lesson={draft} go={go} />
+            ) : null}
           </div>
         </div>
         </>

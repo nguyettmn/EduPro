@@ -5,6 +5,7 @@ import type {
   Assignment,
   ClassGroup,
   GameDef,
+  HtmlGame,
   Lesson,
   LessonSection,
   MarketplaceItem,
@@ -19,6 +20,7 @@ import type {
 } from '../types';
 import { QUESTIONS } from './questions';
 import { correctStudentAnswer, scoreAnswers } from '../answers';
+import { SAMPLE_GAME_HTML } from './sampleGame';
 
 const DAY = 86400000;
 const iso = (offsetDays: number): string =>
@@ -357,6 +359,28 @@ export const LESSON_COPIES: Lesson[] = [
 </div>
 </body>
 </html>`,
+  },
+];
+
+// ---------- HTML games ----------
+
+// Sample HTML game (the shape AI game generation produces) attached to
+// the sample HTML lesson, so the game flows — play, results, edit — can
+// be tried without an API key. Clearly labelled; the teacher can delete it.
+export const HTML_GAMES: HtmlGame[] = [
+  {
+    id: 'HG-SAMPLE1',
+    title: '[Mẫu] Bắt đáp án đúng — Rút gọn phân số',
+    mechanic: 'Defender',
+    theme: 'Săn đáp án',
+    htmlCode: SAMPLE_GAME_HTML,
+    ownerId: 'u-teacher-a',
+    lessonId: 'LC-HTML1',
+    seed: 'M4U1',
+    createdAt: '2026-11-16',
+    grade: 5,
+    subject: 'Toán',
+    topic: 'Rút gọn phân số',
   },
 ];
 

@@ -15,4 +15,6 @@ export interface Route {
   classId?: string;
   /** View to return to from the Tutor Space summary back button. */
   from?: ViewId;
+  /** Game being edited in the game studio (absent = create new). */
+  gameId?: string;
 }

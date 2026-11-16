@@ -15,6 +15,7 @@ import { StudioShell } from './components/StudioShell';
 import { KhoBaiChuanView } from './components/KhoBaiChuanView';
 import { ManagedView } from './components/ManagedView';
 import { TutorSpace } from './components/TutorSpace';
+import { GameStudio } from './components/GameStudio';
 import { ManageViews, SettingsView } from './components/ManageViews';
 import { EmptyState } from './components/ui';
 
@@ -51,7 +52,9 @@ function AppInner() {
   const activeView =
     route.view === 'lesson'
       ? (route.from ?? (isStudent ? 'assignments' : 'studio'))
-      : route.view;
+      : route.view === 'gamestudio'
+        ? (route.from ?? 'studio')
+        : route.view;
 
   return (
     <Shell
@@ -86,6 +89,8 @@ function AppInner() {
         <ManagedView account={currentAccount} go={go} />
       ) : route.view === 'tutor' ? (
         <TutorSpace account={currentAccount} route={route} go={go} />
+      ) : route.view === 'gamestudio' ? (
+        <GameStudio account={currentAccount} route={route} go={go} />
       ) : route.view === 'manage' ? (
         <ManageViews account={currentAccount} />
       ) : (

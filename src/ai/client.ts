@@ -51,7 +51,7 @@ export async function callAiJson<T>(
 export type AiStageResult =
   | { stage: 'propose'; text: string; warnings: string[] }
   | {
-      stage: 'generate' | 'revise';
+      stage: 'generate' | 'revise' | 'game-generate' | 'game-revise';
       html: string;
       title: string;
       assumptions: string[];
@@ -138,8 +138,13 @@ export async function callAiSoanBai(
                 warnings: Array.isArray(event.warnings) ? (event.warnings as string[]) : [],
               };
             }
-            // JSON stages (plan/exercises) never use this SSE client.
-            if (body.stage !== 'generate' && body.stage !== 'revise') {
+            // JSON stages (plan/exercises/game-propose) never use this SSE client.
+            if (
+              body.stage !== 'generate' &&
+              body.stage !== 'revise' &&
+              body.stage !== 'game-generate' &&
+              body.stage !== 'game-revise'
+            ) {
               throw new AiApiError('server_error', 'Máy chủ trả về kết quả không đúng định dạng.');
             }
             return {

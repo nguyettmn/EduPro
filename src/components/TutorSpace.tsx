@@ -9,6 +9,7 @@ import { REFERENCE, useStore } from '../state/store';
 import type { Route } from '../route';
 import { tutorReply } from '../tutorEngine';
 import { GameView } from './GameView';
+import { LessonGamesSection } from './LessonGamesSection';
 import { QuizRunner } from './QuizRunner';
 import { EmptyState, SectionBand, StatCard, TopicTag } from './ui';
 
@@ -61,7 +62,14 @@ function TutorSummary({
         <StatCard label="Số buổi luyện" value={String(tutor?.sessions ?? 0)} color="#be185d" />
         <StatCard label="Câu cần ôn lại" value={String(tutor?.reviewQuestionIds.length ?? 0)} color="#be185d" />
         <StatCard label="Câu đã thuộc" value={String(tutor?.masteredIds.length ?? 0)} color="#be185d" />
-        <StatCard label="Game tự tạo" value={String(tutor?.selfGames.length ?? 0)} color="#be185d" />
+        <StatCard
+          label="Game tự tạo"
+          value={String(
+            (tutor?.selfGames.length ?? 0) +
+              state.htmlGames.filter((g) => g.ownerId === student.id && !g.lessonId).length,
+          )}
+          color="#be185d"
+        />
       </div>
       <h3 className="subhead">Chủ đề còn yếu</h3>
       {tutor && tutor.weakTopics.length > 0 ? (
@@ -416,6 +424,7 @@ export function TutorSpace({
               </div>
             ))
           )}
+          <LessonGamesSection account={account} lesson={null} go={go} />
         </div>
       ) : null}
 

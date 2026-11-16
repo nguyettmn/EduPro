@@ -10,6 +10,7 @@ import { HtmlLessonPlayer } from './HtmlLessonPlayer';
 import { LessonExerciseSets } from './ExerciseRunner';
 import { QuizRunner } from './QuizRunner';
 import { GameView } from './GameView';
+import { LessonGamesSection } from './LessonGamesSection';
 import { EmptyState, TopicTag } from './ui';
 
 function LessonDetail({
@@ -84,6 +85,7 @@ function LessonDetail({
         <>
           <HtmlLessonPlayer html={lesson.html!} title={lesson.title} />
           <LessonExerciseSets lessonId={lesson.id} />
+          <LessonGamesSection account={account} lesson={lesson} go={go} />
         </>
       ) : (
         <>
@@ -99,11 +101,14 @@ function LessonDetail({
         </button>
       </div>
       {tab === 'content' ? (
-        <LessonPlayer
-          lesson={lesson}
-          onStartPractice={() => setTab('practice')}
-          onPlayGame={() => setTab('game')}
-        />
+        <>
+          <LessonPlayer
+            lesson={lesson}
+            onStartPractice={() => setTab('practice')}
+            onPlayGame={() => setTab('game')}
+          />
+          <LessonGamesSection account={account} lesson={lesson} go={go} />
+        </>
       ) : null}
       {tab === 'practice' ? (
         <QuizRunner

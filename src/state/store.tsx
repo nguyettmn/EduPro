@@ -10,6 +10,8 @@ import type {
   ClassGroup,
   ExerciseSet,
   GameDef,
+  GameResult,
+  HtmlGame,
   Lesson,
   Proposal,
   RepoItem,
@@ -22,6 +24,7 @@ import {
   ACCOUNTS,
   ASSIGNMENTS,
   CLASSES,
+  HTML_GAMES,
   LESSON_COPIES,
   PACK,
   PACK_LESSONS,
@@ -33,7 +36,7 @@ import {
   TUTOR_DATA,
 } from '../data/seed';
 import { QUESTIONS } from '../data/questions';
-import { topicResults, updateWeakTopics } from '../answers';
+import { topicResults, topicResultsFromGameSkills, updateWeakTopics } from '../answers';
 
 export interface AppState {
   currentAccountId: string | null;
@@ -48,6 +51,11 @@ export interface AppState {
   tutor: Record<string, TutorData>;
   /** Practice exercise sets generated from lessons, keyed by set id. */
   exerciseSets: ExerciseSet[];
+  /** Single-file HTML games (AI-generated or uploaded), attached to
+   * lessons or standalone in a student's Tutor Space. */
+  htmlGames: HtmlGame[];
+  /** Finished runs reported by HTML games via EDUPRO_GAME_RESULT. */
+  gameResults: GameResult[];
   /** Personal Space renames, keyed by student id. */
   spaceNames: Record<string, string>;
   /** Admin school filter (null = all schools). */
@@ -70,6 +78,8 @@ export function buildInitialState(): AppState {
     repoItems: clone(REPO_ITEMS),
     tutor: clone(TUTOR_DATA),
     exerciseSets: [],
+    htmlGames: clone(HTML_GAMES),
+    gameResults: [],
     spaceNames: {},
     schoolFilter: null,
   };
@@ -91,6 +101,10 @@ export type Action =
   | { type: 'CREATE_EXERCISE_SET'; set: ExerciseSet }
   | { type: 'UPDATE_EXERCISE_SET'; set: ExerciseSet }
   | { type: 'DELETE_EXERCISE_SET'; setId: string }
+  | { type: 'CREATE_HTML_GAME'; game: HtmlGame }
+  | { type: 'UPDATE_HTML_GAME'; game: HtmlGame }
+  | { type: 'DELETE_HTML_GAME'; gameId: string }
+  | { type: 'RECORD_HTML_GAME_RESULT'; result: GameResult }
   | { type: 'ADD_REVIEW_QUESTION'; studentId: string; questionId: string }
   | { type: 'MARK_MASTERED'; studentId: string; questionId: string }
   | { type: 'ADD_CHAT'; studentId: string; message: ChatMsg }
@@ -211,6 +225,45 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     case 'DELETE_EXERCISE_SET':
       return { ...state, exerciseSets: state.exerciseSets.filter((s) => s.id !== action.setId) };
+    case 'CREATE_HTML_GAME':
+      return { ...state, htmlGames: [...state.htmlGames, action.game] };
+    case 'UPDATE_HTML_GAME':
+      return {
+        ...state,
+        htmlGames: state.htmlGames.map((g) => (g.id === action.game.id ? action.game : g)),
+      };
+    case 'DELETE_HTML_GAME':
+      return { ...state, htmlGames: state.htmlGames.filter((g) => g.id !== action.gameId) };
+    case 'RECORD_HTML_GAME_RESULT': {
+      const result = action.result;
+      const tutorData = state.tutor[result.studentId];
+      const gameResults = [...state.gameResults, result];
+      if (!tutorData) return { ...state, gameResults };
+      // A finished game run is fresh evidence about weak topics, with
+      // the same rule as a submission: fully correct clears a topic,
+      // under half correct flags it.
+      const weakTopics = updateWeakTopics(
+        tutorData.weakTopics,
+        topicResultsFromGameSkills(result.skills, PACK.topics),
+        PACK.topics.map((t) => t.id),
+      );
+      const prevBest = tutorData.bestScores[result.gameId] ?? 0;
+      return {
+        ...state,
+        gameResults,
+        tutor: {
+          ...state.tutor,
+          [result.studentId]: {
+            ...tutorData,
+            weakTopics,
+            bestScores: {
+              ...tutorData.bestScores,
+              [result.gameId]: Math.max(prevBest, result.score),
+            },
+          },
+        },
+      };
+    }
     case 'ADD_REVIEW_QUESTION': {
       const t = state.tutor[action.studentId];
       if (!t || t.reviewQuestionIds.includes(action.questionId)) return state;

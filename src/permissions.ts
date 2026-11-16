@@ -32,11 +32,11 @@ export type Action =
   | 'reviewStudentProposal';
 
 const ROLE_VIEWS: Record<Role, ViewId[]> = {
-  admin: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings'],
-  principal: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings'],
-  lead: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings'],
-  teacher: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'settings'],
-  student: ['dashboard', 'lesson', 'assignments', 'tutor', 'settings'],
+  admin: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings', 'gamestudio'],
+  principal: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings', 'gamestudio'],
+  lead: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings', 'gamestudio'],
+  teacher: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'settings', 'gamestudio'],
+  student: ['dashboard', 'lesson', 'assignments', 'tutor', 'settings', 'gamestudio'],
 };
 
 // Students are added by email, never by teachers creating accounts
@@ -63,13 +63,15 @@ const NAV_LABELS: Record<ViewId, string> = {
   tutor: 'Tutor Space',
   manage: 'Quản lý',
   settings: 'Hồ sơ',
+  gamestudio: 'Tạo game',
 };
 
 export function getNavItems(account: Account, spaceName?: string): NavItem[] {
   // The lesson view is reached from Soạn bài / Space, not from top-level nav.
+  // The game studio is reached from a lesson or the Tutor Space.
   // Students see their Space under its own (possibly renamed) name.
   return ROLE_VIEWS[account.role]
-    .filter((v) => v !== 'lesson')
+    .filter((v) => v !== 'lesson' && v !== 'gamestudio')
     .map((view) => ({
       view,
       label: view === 'assignments' && spaceName ? spaceName : NAV_LABELS[view],
