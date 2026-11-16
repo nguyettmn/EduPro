@@ -2,7 +2,7 @@
 // Demo state is in-memory (resets on reload). The only network call is
 // POST /api/ai-soan-bai, the server-side Gemini route for AI authoring.
 
-export type Role = 'admin' | 'principal' | 'lead' | 'teacher' | 'student';
+export type Role = 'principal' | 'lead' | 'teacher' | 'student';
 
 export interface RoleMeta {
   label: string;
@@ -12,7 +12,6 @@ export interface RoleMeta {
 
 // Exact colours from the approved role diagram. Used everywhere a role appears.
 export const ROLE_META: Record<Role, RoleMeta> = {
-  admin: { label: 'Admin', color: '#6d28d9', tint: '#f5f3ff' },
   principal: { label: 'Hiệu trưởng', color: '#1d4ed8', tint: '#eff6ff' },
   lead: { label: 'Tổ trưởng', color: '#0f766e', tint: '#f0fdfa' },
   teacher: { label: 'Giáo viên', color: '#ea580c', tint: '#fff7ed' },
@@ -23,7 +22,9 @@ export interface Account {
   id: string;
   name: string;
   role: Role;
-  /** Admin has no single school: null means "all schools". */
+  /** Every account belongs to one school; null is unused by current
+   * roles (there is no Admin role: the system's owner edits the source
+   * code and the database directly). */
   schoolId: string | null;
   teamId: string | null;
   /** Teachers: classes they teach. Students: [own class]. */

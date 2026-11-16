@@ -4,7 +4,7 @@ import type { Account, Role } from '../types';
 import { ROLE_META } from '../types';
 import { REFERENCE } from '../state/store';
 
-const ROLE_ORDER: Role[] = ['admin', 'principal', 'lead', 'teacher', 'student'];
+const ROLE_ORDER: Role[] = ['principal', 'lead', 'teacher', 'student'];
 
 export function AccountPicker({
   accounts,
@@ -58,7 +58,7 @@ export function AccountPicker({
           );
         })}
         <p className="picker-foot">
-          Tài khoản mẫu thuộc Trường Tiểu học An Bình, trừ Admin xem được cả hai trường.
+          Tài khoản mẫu thuộc Trường Tiểu học An Bình.
         </p>
       </div>
     </div>

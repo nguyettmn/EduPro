@@ -28,7 +28,6 @@ npm run preview
 
 | Vai trò      | Màu        | Mã màu    |
 | ------------ | ---------- | --------- |
-| Admin        | Tím        | `#6d28d9` |
 | Hiệu trưởng  | Xanh dương | `#1d4ed8` |
 | Tổ trưởng    | Xanh ngọc  | `#0f766e` |
 | Giáo viên    | Cam        | `#ea580c` |
@@ -53,13 +52,16 @@ thái đang chọn trong điều hướng.
 
 ## Tài khoản mẫu
 
-- Admin: Quản trị hệ thống — xem cả hai trường.
 - Hiệu trưởng: Cô Hiệu trưởng Lan — Trường Tiểu học An Bình.
 - Tổ trưởng: Thầy Tổ trưởng Toán — Tổ Toán 5.
 - Giáo viên: Cô Mai (Toán 5, Lớp 5A và Lớp 5B) và Thầy Hùng (Toán 6, Lớp 6B, tổ khác).
 - Học sinh Lớp 5A: An, Bình, Chi. Học sinh Lớp 5B: Phương, Tuấn. Học sinh Lớp 6B: Dũng.
-- Trường Tiểu học Bình Minh có dữ liệu tối thiểu để Admin thấy quản lý nhiều
-  trường.
+- Trường Tiểu học Bình Minh có dữ liệu tối thiểu (Hiệu trưởng Bình Minh, Cô
+  Thu, Hà, Minh) để thử phạm vi khác trường.
+
+Không có vai trò Admin: người sửa mã nguồn chính là người quản trị hệ
+thống, nên các việc hệ thống (thêm trường, tạo tài khoản Hiệu trưởng)
+làm trực tiếp trên mã nguồn / cơ sở dữ liệu.
 
 ## Điều hướng (theo quy trình làm việc)
 
@@ -74,7 +76,7 @@ thái đang chọn trong điều hướng.
   chuẩn theo chương trình BGD và chợ công khai; Trong phạm vi quản lý cho
   xem và copy bản sao của người mình quản lý. Hồ sơ giữ hồ sơ giảng dạy
   (khối và môn dạy, chọn trước để khỏi chọn lại mỗi lần soạn bài bằng AI).
-- Tổ trưởng, Hiệu trưởng, Admin: thêm mục Quản lý.
+- Tổ trưởng, Hiệu trưởng: thêm mục Quản lý.
 - Học sinh: Trang chính, Space (tên lớp học của em, em tự đổi tên riêng),
   Tutor Space, Hồ sơ. Bài giao nằm trong Space; bài giao riêng chỉ hiện
   với học sinh được giao.

@@ -45,7 +45,6 @@ export const CLASSES: ClassGroup[] = [
 ];
 
 export const ACCOUNTS: Account[] = [
-  { id: 'u-admin', name: 'Quản trị hệ thống', role: 'admin', schoolId: null, teamId: null, classIds: [], demoLogin: true, initials: 'AD' },
   { id: 'u-principal', name: 'Cô Hiệu trưởng Lan', role: 'principal', schoolId: 'S1', teamId: null, classIds: [], demoLogin: true, initials: 'HL' },
   { id: 'u-lead', name: 'Thầy Tổ trưởng Toán', role: 'lead', schoolId: 'S1', teamId: 'T1', classIds: [], demoLogin: true, initials: 'TT' },
   { id: 'u-teacher-a', name: 'Cô Mai — Toán 5', role: 'teacher', schoolId: 'S1', teamId: 'T1', classIds: ['C5A', 'C5B'], demoLogin: true, initials: 'CM', teachingProfile: { grades: [5], subjectsByGrade: { '5': ['Toán'] } } },

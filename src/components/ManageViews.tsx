@@ -5,7 +5,7 @@ import { useState } from 'react';
 import type { Account } from '../types';
 import { ROLE_META } from '../types';
 import { canDo, visibleClasses, visibleStudents, visibleTeachers } from '../permissions';
-import { REFERENCE, useStore } from '../state/store';
+import { useStore } from '../state/store';
 import { RoleBadge } from './RoleBadge';
 import { TeachingProfileForm } from './TeachingProfile';
 import { EmptyState, SectionBand } from './ui';
@@ -139,60 +139,9 @@ export function AddStudentForm({
 }
 
 export function ManageViews({ account }: { account: Account }) {
-  const { state, dispatch } = useStore();
+  const { state } = useStore();
   const students = visibleStudents(account, state.accounts);
   const teachers = visibleTeachers(account, state.accounts);
-
-  if (canDo(account, 'manageSystem')) {
-    const filtered = state.schoolFilter
-      ? state.accounts.filter((a) => a.schoolId === state.schoolFilter)
-      : state.accounts;
-    return (
-      <div>
-        <SectionBand title="Quản lý hệ thống" guide="Tất cả trường và tài khoản. Chọn một trường để lọc." />
-        <label className="field field-inline">
-          <span>Lọc theo trường</span>
-          <select
-            value={state.schoolFilter ?? ''}
-            onChange={(e) => dispatch({ type: 'SET_SCHOOL_FILTER', schoolId: e.target.value === '' ? null : e.target.value })}
-          >
-            <option value="">Tất cả các trường</option>
-            {REFERENCE.SCHOOLS.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Tài khoản</th>
-                <th>Vai trò</th>
-                <th>Trường</th>
-                <th>Lớp</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.name}</td>
-                  <td>{ROLE_META[a.role].label}</td>
-                  <td>
-                    {a.schoolId
-                      ? REFERENCE.SCHOOLS.find((s) => s.id === a.schoolId)?.name ?? ''
-                      : 'Tất cả các trường'}
-                  </td>
-                  <td>{a.classIds.map((id) => state.classes.find((c) => c.id === id)?.name ?? id).join(', ') || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div>

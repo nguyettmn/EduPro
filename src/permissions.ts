@@ -4,7 +4,9 @@
 //
 // Principle (user decision): if A manages B, A sees everything of B EXCEPT
 // the contents of a student's Tutor Space (managers see only a summary).
-// Chain: Admin > Principal > Team Lead > Teacher > Student.
+// Chain: Principal > Team Lead > Teacher > Student. There is no Admin
+// role (user decision 2026-11-16): the "admin" is the person who edits
+// the source code, so system-wide concerns live outside the app.
 // Access = view, copy, re-assign, request edits. No direct edit/delete of
 // someone else's original: edits happen on a copy.
 import type {
@@ -24,7 +26,6 @@ export type Action =
   | 'addStudent'
   | 'createClass'
   | 'manageSchool'
-  | 'manageSystem'
   | 'propose'
   | 'useTutor'
   | 'approveTeam'
@@ -32,7 +33,6 @@ export type Action =
   | 'reviewStudentProposal';
 
 const ROLE_VIEWS: Record<Role, ViewId[]> = {
-  admin: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings', 'gamestudio'],
   principal: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings', 'gamestudio'],
   lead: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings', 'gamestudio'],
   teacher: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'settings', 'gamestudio'],
@@ -41,10 +41,9 @@ const ROLE_VIEWS: Record<Role, ViewId[]> = {
 
 // Students are added by email, never by teachers creating accounts
 // (user decision 2026-11-15). Teachers create their own classes; a
-// principal/admin creating a class would also need to pick its teacher,
+// principal creating a class would also need to pick its teacher,
 // which the current form does not offer.
 const ROLE_ACTIONS: Record<Role, Action[]> = {
-  admin: ['createContent', 'addStudent', 'manageSchool', 'manageSystem', 'propose', 'approveTeam', 'approveSchool', 'reviewStudentProposal'],
   principal: ['createContent', 'assign', 'addStudent', 'manageSchool', 'propose', 'approveSchool'],
   lead: ['createContent', 'assign', 'propose', 'approveTeam'],
   teacher: ['createContent', 'assign', 'grade', 'addStudent', 'createClass', 'propose', 'reviewStudentProposal'],
@@ -91,8 +90,6 @@ export function canDo(account: Account, action: Action): boolean {
 /** Accounts the viewer manages (directly or transitively), excluding self. */
 export function managedAccounts(viewer: Account, accounts: Account[]): Account[] {
   switch (viewer.role) {
-    case 'admin':
-      return accounts.filter((a) => a.id !== viewer.id);
     case 'principal':
       return accounts.filter(
         (a) => a.id !== viewer.id && a.schoolId === viewer.schoolId,
@@ -136,8 +133,6 @@ export function visibleClasses(
   classes: ClassGroup[],
 ): ClassGroup[] {
   switch (viewer.role) {
-    case 'admin':
-      return classes;
     case 'principal':
       return classes.filter((c) => c.schoolId === viewer.schoolId);
     case 'lead':
@@ -196,9 +191,9 @@ export function canViewTutorSummary(
 
 /**
  * Who may decide this proposal right now?
- * - stage 'teacher': the class teacher of the student proposer (or Admin).
- * - stage 'team': the Team Lead of the proposal's team (or Admin).
- * - stage 'school': the Principal of the proposal's school (or Admin).
+ * - stage 'teacher': the class teacher of the student proposer.
+ * - stage 'team': the Team Lead of the proposal's team.
+ * - stage 'school': the Principal of the proposal's school.
  */
 export function canDecideProposal(
   viewer: Account,
@@ -206,7 +201,6 @@ export function canDecideProposal(
   accounts: Account[],
 ): boolean {
   if (proposal.status !== 'pending') return false;
-  if (viewer.role === 'admin') return true;
   if (proposal.stage === 'teacher') {
     if (!canDo(viewer, 'reviewStudentProposal')) return false;
     const proposer = accounts.find((a) => a.id === proposal.createdBy);

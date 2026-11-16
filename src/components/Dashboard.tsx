@@ -131,50 +131,6 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
         color={meta.color}
       />
 
-      {account.role === 'admin' ? (
-        <>
-          <div className="stat-grid">
-            <StatCard label="Trường" value={String(REFERENCE.SCHOOLS.length)} color={meta.color} />
-            <StatCard label="Tài khoản" value={String(state.accounts.length)} color={meta.color} />
-            <StatCard label="Bài đang giao" value={String(state.assignments.filter((a) => a.status === 'active').length)} color={meta.color} />
-            <StatCard label="Đề xuất chờ duyệt" value={String(state.proposals.filter((p) => p.status === 'pending').length)} color={meta.color} />
-          </div>
-          <h3 className="subhead">Các trường</h3>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Trường</th>
-                  <th>Giáo viên</th>
-                  <th>Học sinh</th>
-                  <th>Bài đang giao</th>
-                </tr>
-              </thead>
-              <tbody>
-                {REFERENCE.SCHOOLS.map((s) => {
-                  const schoolAccounts = state.accounts.filter((a) => a.schoolId === s.id);
-                  const schoolClasses = state.classes.filter((c) => c.schoolId === s.id);
-                  return (
-                    <tr key={s.id}>
-                      <td>{s.name}</td>
-                      <td>{schoolAccounts.filter((a) => a.role === 'teacher').length}</td>
-                      <td>{schoolAccounts.filter((a) => a.role === 'student').length}</td>
-                      <td>
-                        {state.assignments.filter((a) => schoolClasses.some((c) => c.id === a.classId)).length}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <p className="guide-text">
-            Lọc theo trường trong trang Quản lý để xem tài khoản từng trường. Tutor Space của học sinh không bao giờ
-            hiện nội dung, kể cả với Admin.
-          </p>
-        </>
-      ) : null}
-
       {account.role === 'principal' ? (
         <>
           <div className="stat-grid">
@@ -296,7 +252,7 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
           )}
           <h3 className="subhead">Lớp của tôi</h3>
           {classes.length === 0 ? (
-            <EmptyState text="Bạn chưa quản lý lớp nào. Quản trị viên sẽ gán lớp cho bạn." />
+            <EmptyState text="Bạn chưa quản lý lớp nào. Hiệu trưởng sẽ gán lớp cho bạn." />
           ) : (
             <div className="todo-list">
               {classes.map((c) => {

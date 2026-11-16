@@ -58,8 +58,6 @@ export interface AppState {
   gameResults: GameResult[];
   /** Personal Space renames, keyed by student id. */
   spaceNames: Record<string, string>;
-  /** Admin school filter (null = all schools). */
-  schoolFilter: string | null;
 }
 
 function clone<T>(value: T): T {
@@ -81,7 +79,6 @@ export function buildInitialState(): AppState {
     htmlGames: clone(HTML_GAMES),
     gameResults: [],
     spaceNames: {},
-    schoolFilter: null,
   };
 }
 
@@ -113,7 +110,6 @@ export type Action =
   | { type: 'UPDATE_LESSON_COPY'; lesson: Lesson }
   | { type: 'CREATE_LESSON_COPY'; lesson: Lesson }
   | { type: 'DELETE_LESSON_COPY'; lessonId: string }
-  | { type: 'SET_SCHOOL_FILTER'; schoolId: string | null }
   | { type: 'RENAME_SPACE'; studentId: string; name: string }
   | { type: 'RESET_DEMO' };
 
@@ -327,8 +323,6 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, lessons: [...state.lessons, action.lesson] };
     case 'DELETE_LESSON_COPY':
       return { ...state, lessons: state.lessons.filter((l) => l.id !== action.lessonId) };
-    case 'SET_SCHOOL_FILTER':
-      return { ...state, schoolFilter: action.schoolId };
     case 'RENAME_SPACE':
       return {
         ...state,

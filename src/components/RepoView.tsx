@@ -41,8 +41,8 @@ export function RepoView({ account }: { account: Account }) {
   const [proposeTarget, setProposeTarget] = useState<'team' | 'school'>('team');
   const [notice, setNotice] = useState<string | null>(null);
 
-  const schoolFilter = canDo(account, 'manageSystem') ? state.schoolFilter : account.schoolId;
-  const inSchool = (schoolId: string) => !schoolFilter || schoolFilter === schoolId;
+  const ownSchool = account.schoolId;
+  const inSchool = (schoolId: string) => !ownSchool || ownSchool === schoolId;
   const teamScope = repoTeamScope(account);
 
   const teamItems = state.repoItems.filter((item) => {
