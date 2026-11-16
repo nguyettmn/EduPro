@@ -12,6 +12,8 @@ import { LibraryView } from './components/LibraryView';
 import { SpaceView } from './components/SpaceView';
 import { RepoView } from './components/RepoView';
 import { StudioShell } from './components/StudioShell';
+import { KhoBaiChuanView } from './components/KhoBaiChuanView';
+import { ManagedView } from './components/ManagedView';
 import { TutorSpace } from './components/TutorSpace';
 import { ManageViews, SettingsView } from './components/ManageViews';
 import { EmptyState } from './components/ui';
@@ -47,7 +49,9 @@ function AppInner() {
     ? spaceNameFor(currentAccount, state.classes, state.spaceNames)
     : undefined;
   const activeView =
-    route.view === 'lesson' ? (isStudent ? 'assignments' : 'studio') : route.view;
+    route.view === 'lesson'
+      ? (route.from ?? (isStudent ? 'assignments' : 'studio'))
+      : route.view;
 
   return (
     <Shell
@@ -76,6 +80,10 @@ function AppInner() {
         <RepoView account={currentAccount} />
       ) : route.view === 'studio' ? (
         <StudioShell account={currentAccount} route={route} go={go} />
+      ) : route.view === 'kho' ? (
+        <KhoBaiChuanView account={currentAccount} go={go} />
+      ) : route.view === 'managed' ? (
+        <ManagedView account={currentAccount} go={go} />
       ) : route.view === 'tutor' ? (
         <TutorSpace account={currentAccount} route={route} go={go} />
       ) : route.view === 'manage' ? (

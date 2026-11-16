@@ -32,10 +32,10 @@ export type Action =
   | 'reviewStudentProposal';
 
 const ROLE_VIEWS: Record<Role, ViewId[]> = {
-  admin: ['dashboard', 'classes', 'lesson', 'studio', 'repo', 'manage', 'settings'],
-  principal: ['dashboard', 'classes', 'lesson', 'studio', 'repo', 'manage', 'settings'],
-  lead: ['dashboard', 'classes', 'lesson', 'studio', 'repo', 'manage', 'settings'],
-  teacher: ['dashboard', 'classes', 'lesson', 'studio', 'repo', 'settings'],
+  admin: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings'],
+  principal: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings'],
+  lead: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'manage', 'settings'],
+  teacher: ['dashboard', 'classes', 'lesson', 'studio', 'kho', 'repo', 'managed', 'settings'],
   student: ['dashboard', 'lesson', 'assignments', 'tutor', 'settings'],
 };
 
@@ -56,8 +56,10 @@ const NAV_LABELS: Record<ViewId, string> = {
   classes: 'Lớp học',
   lesson: 'Bài học',
   studio: 'Soạn bài',
+  kho: 'Kho bài chuẩn',
   assignments: 'Space',
   repo: 'Kho chung',
+  managed: 'Trong phạm vi quản lý',
   tutor: 'Tutor Space',
   manage: 'Quản lý',
   settings: 'Hồ sơ',

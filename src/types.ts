@@ -329,8 +329,10 @@ export type ViewId =
   | 'classes'
   | 'lesson'
   | 'studio'
+  | 'kho'
   | 'assignments'
   | 'repo'
+  | 'managed'
   | 'tutor'
   | 'manage'
   | 'settings';

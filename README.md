@@ -63,14 +63,16 @@ thái đang chọn trong điều hướng.
 
 ## Điều hướng (theo quy trình làm việc)
 
-- Giáo viên: Trang chính (“Hôm nay”), Lớp học, Soạn bài, Kho chung, Hồ
-  sơ. Trang chính liệt kê mọi việc cần xử lý, mỗi việc đều bấm vào được.
-  Lớp học là nơi tạo lớp mới, thêm học sinh bằng email, xem học sinh, bài
-  giao và chấm bài kèm đáp án của học sinh. Soạn bài là một không gian
-  duy nhất: Bài của tôi (xếp theo khối → môn → Topic, dạng thu gọn/mở),
-  Soạn bài mới (AI), Lên chương trình (soạn hàng loạt), Kho bài chuẩn, và
-  bài trong phạm vi quản lý; giao bài ngay từ bài học, cho cả lớp hoặc
-  từng học sinh, và từ cuối trang xem nội dung bài. Hồ sơ giữ hồ sơ giảng dạy
+- Giáo viên: Trang chính (“Hôm nay”), Lớp học, Soạn bài, Kho bài chuẩn,
+  Kho chung, Trong phạm vi quản lý, Hồ sơ. Trang chính liệt kê mọi việc
+  cần xử lý, mỗi việc đều bấm vào được. Lớp học là nơi tạo lớp mới, thêm
+  học sinh bằng email, xem học sinh, bài giao và chấm bài kèm đáp án của
+  học sinh. Soạn bài là một không gian duy nhất: Bài của tôi (xếp theo
+  khối → môn → Topic, dạng thu gọn/mở), Soạn bài mới (AI), Lên chương
+  trình (soạn hàng loạt); giao bài ngay từ bài học, cho cả lớp hoặc từng
+  học sinh, và từ cuối trang xem nội dung bài. Kho bài chuẩn là nội dung
+  chuẩn theo chương trình BGD và chợ công khai; Trong phạm vi quản lý cho
+  xem và copy bản sao của người mình quản lý. Hồ sơ giữ hồ sơ giảng dạy
   (khối và môn dạy, chọn trước để khỏi chọn lại mỗi lần soạn bài bằng AI).
 - Tổ trưởng, Hiệu trưởng, Admin: thêm mục Quản lý.
 - Học sinh: Trang chính, Space (tên lớp học của em, em tự đổi tên riêng),

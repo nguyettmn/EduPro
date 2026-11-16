@@ -1,9 +1,10 @@
 // Studio: one lesson workspace. Compose on COPIES (never edit someone
-// else's original), browse the Pack, and assign any lesson — copy or
-// pack original — to a class or to individual students, from the lesson.
+// else's original), and assign any lesson to a class or to individual
+// students, from the lesson. Kho bài chuẩn and Trong phạm vi quản lý
+// are standalone sidebar views (KhoBaiChuanView, ManagedView).
 import { useEffect, useRef, useState } from 'react';
 import type { Account, Lesson, LessonSection } from '../types';
-import { GRADES, SUBJECTS_BY_GRADE, gradesFor, subjectsFor } from '../ai/subjects';
+import { GRADES, SUBJECTS_BY_GRADE } from '../ai/subjects';
 import {
   buildSubjectExport,
   downloadTextFile,
@@ -12,18 +13,15 @@ import {
   safeFilename,
   sourceJsonFor,
 } from '../ai/lessonFile';
-import { QUESTIONS } from '../data/questions';
-import { MARKETPLACE_ITEMS } from '../data/seed';
-import { managedAccounts, visibleClasses, visibleStudents } from '../permissions';
+import { visibleClasses, visibleStudents } from '../permissions';
 import { REFERENCE, useStore } from '../state/store';
 import type { Route } from '../route';
 import { MathExpr } from './Fraction';
-import { LessonPlayer } from './LessonPlayer';
 import { HtmlLessonPlayer } from './HtmlLessonPlayer';
 import { AiStudio } from './AiStudio';
 import { BatchPlanner, type BatchItem } from './BatchPlanner';
 import { LessonExerciseSection } from './ExerciseStudio';
-import { EmptyState, SectionBand, TopicTag } from './ui';
+import { EmptyState, SectionBand } from './ui';
 
 const BLANK_SECTION = (id: string): LessonSection => ({
   id,
@@ -36,7 +34,7 @@ const todayIso = (): string => new Date().toISOString().slice(0, 10);
 const plusDays = (n: number): string =>
   new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 
-function AssignSheet({
+export function AssignSheet({
   account,
   lesson,
   go,
@@ -423,22 +421,13 @@ export function StudioShell({
   go: (route: Route) => void;
 }) {
   const { state, dispatch } = useStore();
-  const [tab, setTab] = useState<'mine' | 'ai' | 'plan' | 'kho' | 'managed'>('mine');
+  const [tab, setTab] = useState<'mine' | 'ai' | 'plan'>('mine');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Lesson | null>(null);
   const [saved, setSaved] = useState(false);
   const [proposeTarget, setProposeTarget] = useState<'team' | 'school'>('team');
-  const [previewId, setPreviewId] = useState<string | null>(null);
-  const [topicFilter, setTopicFilter] = useState<string | null>(null);
   const [assignLessonId, setAssignLessonId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [khoBranch, setKhoBranch] = useState<'bgd' | 'market'>('bgd');
-  const [bgdGrade, setBgdGrade] = useState(() => gradesFor(account.teachingProfile)[0] ?? 5);
-  const [bgdSubject, setBgdSubject] = useState(
-    () => subjectsFor(account.teachingProfile, gradesFor(account.teachingProfile)[0] ?? 5)[0] ?? 'Toán',
-  );
-  const [marketPreviewId, setMarketPreviewId] = useState<string | null>(null);
-  const [marketNotice, setMarketNotice] = useState<string | null>(null);
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [aiPrefill, setAiPrefill] = useState<{ topic: string; grade: number; subject: string } | null>(null);
   const [aiPrefillNonce, setAiPrefillNonce] = useState(0);
@@ -545,15 +534,6 @@ export function StudioShell({
         .concat(REFERENCE.PACK.topics.map((t) => t.title)),
     ),
   ).sort((a, b) => a.localeCompare(b, 'vi'));
-  const managed = managedAccounts(account, state.accounts);
-  const managedCopies = state.lessons.filter(
-    (l) => l.ownerId && managed.some((a) => a.id === l.ownerId),
-  );
-  const pack = REFERENCE.PACK;
-  const packLessons = pack.lessonIds
-    .map((id) => state.lessons.find((l) => l.id === id))
-    .filter((l): l is Lesson => Boolean(l))
-    .filter((l) => !topicFilter || l.topicIds.includes(topicFilter));
   const assignLesson = assignLessonId
     ? state.lessons.find((l) => l.id === assignLessonId)
     : undefined;
@@ -576,7 +556,7 @@ export function StudioShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeLessonId]);
 
-  const pickTab = (next: 'mine' | 'ai' | 'plan' | 'kho' | 'managed') => {
+  const pickTab = (next: 'mine' | 'ai' | 'plan') => {
     setTab(next);
     setAssignLessonId(null);
     setNotice(null);
@@ -666,21 +646,6 @@ export function StudioShell({
     setNotice(`Đã gửi đề xuất lên ${proposeTarget === 'team' ? 'Kho Tổ' : 'Kho Trường'}.`);
   };
 
-  const copyToMine = (source: Lesson, extra?: Partial<Lesson>) => {
-    const copy = {
-      ...JSON.parse(JSON.stringify(source)) as Lesson,
-      id: `LC-${Date.now()}`,
-      title: `${source.title} (bản của ${account.name})`,
-      ownerId: account.id,
-      sourceId: source.id,
-      ...extra,
-    };
-    dispatch({ type: 'COPY_TO_MY_SPACE', lesson: copy });
-    setTab('mine');
-    setSelectedId(copy.id);
-    setNotice('Đã copy bài về không gian của bạn.');
-  };
-
   return (
     <div>
       <SectionBand
@@ -697,12 +662,6 @@ export function StudioShell({
         </button>
         <button type="button" className={tab === 'plan' ? 'tab tab-active' : 'tab'} onClick={() => pickTab('plan')}>
           Lên chương trình
-        </button>
-        <button type="button" className={tab === 'kho' ? 'tab tab-active' : 'tab'} onClick={() => pickTab('kho')}>
-          Kho bài chuẩn
-        </button>
-        <button type="button" className={tab === 'managed' ? 'tab tab-active' : 'tab'} onClick={() => pickTab('managed')}>
-          Trong phạm vi quản lý ({managedCopies.length})
         </button>
       </div>
 
@@ -1099,258 +1058,6 @@ export function StudioShell({
         />
       ) : null}
 
-      {tab === 'kho' ? (
-        assignLesson ? (
-          <AssignSheet
-            key={assignLesson.id}
-            account={account}
-            lesson={assignLesson}
-            go={go}
-            onBack={() => setAssignLessonId(null)}
-          />
-        ) : (
-          <div>
-            <div className="tabs" role="tablist">
-              <button
-                type="button"
-                className={khoBranch === 'bgd' ? 'tab tab-active' : 'tab'}
-                onClick={() => setKhoBranch('bgd')}
-              >
-                Theo chương trình BGD
-              </button>
-              <button
-                type="button"
-                className={khoBranch === 'market' ? 'tab tab-active' : 'tab'}
-                onClick={() => setKhoBranch('market')}
-              >
-                Kho user nộp lên (chợ)
-              </button>
-            </div>
-            {khoBranch === 'market' ? (
-              <div>
-                <p className="guide-text">
-                  Chợ công khai: giáo viên chia sẻ hoặc bán bài cho nhau, EduPro chỉ thu phí chợ nhỏ. Bài nào
-                  soạn cùng AI đều được ghi rõ. Bản demo chưa có thanh toán và đăng bán — bài miễn phí thì lấy
-                  về dùng ngay được.
-                </p>
-                {marketNotice ? <p className="notice">{marketNotice}</p> : null}
-                <div className="lesson-grid">
-                  {MARKETPLACE_ITEMS.map((item) => {
-                    const open = marketPreviewId === item.id;
-                    return (
-                      <div
-                        key={item.id}
-                        className="lesson-card"
-                        style={{ borderTopColor: item.lesson.color }}
-                      >
-                        <span className="lesson-card-title">{item.title}</span>
-                        <span className="muted">
-                          {item.sellerName} · Khối {item.grade} · {item.subject} · Topic {item.topic}
-                        </span>
-                        <span>{item.description}</span>
-                        <span className="tag-row">
-                          <span
-                            className="topic-tag"
-                            style={{ backgroundColor: item.price === 0 ? '#059669' : '#d97706' }}
-                          >
-                            {item.price === 0 ? 'Miễn phí' : `${item.price.toLocaleString('vi-VN')} đ`}
-                          </span>
-                          {item.aiAssisted ? (
-                            <span className="topic-tag" style={{ backgroundColor: '#475569' }}>
-                              Soạn cùng AI
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="row-actions">
-                          <button
-                            type="button"
-                            className="btn btn-small"
-                            onClick={() => setMarketPreviewId(open ? null : item.id)}
-                          >
-                            {open ? 'Đóng xem trước' : 'Xem trước'}
-                          </button>
-                          {item.price === 0 ? (
-                            <button
-                              type="button"
-                              className="btn btn-small btn-secondary"
-                              onClick={() =>
-                                copyToMine(item.lesson, {
-                                  grade: item.grade,
-                                  subject: item.subject,
-                                  topic: item.topic,
-                                })
-                              }
-                            >
-                              Lấy về Bài của tôi
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="btn btn-small btn-primary"
-                              onClick={() =>
-                                setMarketNotice(
-                                  'Bản demo chưa có thanh toán. Bạn có thể xem trước nội dung, còn mua bán thật sẽ mở khi có backend và thanh toán.',
-                                )
-                              }
-                            >
-                              Mua — {item.price.toLocaleString('vi-VN')} đ
-                            </button>
-                          )}
-                        </span>
-                        {open ? (
-                          <div className="repo-item-body">
-                            <LessonPlayer lesson={item.lesson} />
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="field-row">
-                  <label className="field">
-                    <span>Khối</span>
-                    <select
-                      value={bgdGrade}
-                      onChange={(e) => {
-                        const next = Number(e.target.value);
-                        setBgdGrade(next);
-                        setBgdSubject((SUBJECTS_BY_GRADE[next] ?? [])[0] ?? 'Toán');
-                      }}
-                    >
-                      {GRADES.map((g) => (
-                        <option key={g} value={g}>
-                          Khối {g}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Môn</span>
-                    <select value={bgdSubject} onChange={(e) => setBgdSubject(e.target.value)}>
-                      {(SUBJECTS_BY_GRADE[bgdGrade] ?? []).map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                {bgdGrade === pack.grade && bgdSubject === pack.subject ? (
-                  <>
-                    <div className="pack-card" style={{ borderTopColor: pack.color }}>
-              <div className="pack-title">{pack.title}</div>
-              <div className="muted">
-                Khối {pack.grade} · Môn {pack.subject} · {pack.lessonIds.length} bài học · {QUESTIONS.length} câu hỏi
-              </div>
-              <div className="tag-row">
-                {pack.topics.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={topicFilter === t.id ? 'topic-filter topic-filter-active' : 'topic-filter'}
-                    style={{ borderColor: t.color, color: t.color }}
-                    onClick={() => setTopicFilter(topicFilter === t.id ? null : t.id)}
-                  >
-                    {t.code} · {t.title}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="lesson-grid">
-              {packLessons.map((l) => {
-                const topics = pack.topics.filter((t) => l.topicIds.includes(t.id));
-                return (
-                  <div key={l.id} className="lesson-card" style={{ borderTopColor: l.color }}>
-                    <span className="lesson-card-title">{l.title}</span>
-                    <span className="tag-row">
-                      {topics.map((t) => (
-                        <TopicTag key={t.id} topic={t} />
-                      ))}
-                    </span>
-                    <span className="muted">
-                      {l.sections.length} phần · {l.questionIds.length} câu hỏi
-                    </span>
-                    <span className="row-actions">
-                      <button
-                        type="button"
-                        className="btn btn-small"
-                        onClick={() => go({ view: 'lesson', lessonId: l.id, tab: 'content' })}
-                      >
-                        Xem
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-small btn-secondary"
-                        onClick={() => copyToMine(l)}
-                      >
-                        Copy về của tôi
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-small btn-primary"
-                        onClick={() => setAssignLessonId(l.id)}
-                      >
-                        Giao bài
-                      </button>
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            {packLessons.length === 0 ? <EmptyState text="Không có bài học nào thuộc chủ đề này." /> : null}
-                  </>
-                ) : (
-                  <EmptyState
-                    text={`Kho bài chuẩn chưa có nội dung cho Khối ${bgdGrade} · Môn ${bgdSubject}. Nội dung chuẩn do phía EduPro biên soạn theo chương trình của Bộ Giáo dục và được bổ sung dần.`}
-                  />
-                )}
-              </>
-            )}
-          </div>
-        )
-      ) : null}
-
-      {tab === 'managed' ? (
-        <div>
-          <p className="guide-text">
-            Đây là bản sao của những người bạn quản lý. Bạn chỉ xem và copy về không gian của mình, không sửa trực
-            tiếp bản của họ.
-          </p>
-          {managedCopies.length === 0 ? (
-            <EmptyState text="Không có bản sao nào trong phạm vi quản lý của bạn." />
-          ) : (
-            managedCopies.map((l) => {
-              const owner = state.accounts.find((a) => a.id === l.ownerId);
-              const open = previewId === l.id;
-              return (
-                <div key={l.id} className="repo-item">
-                  <button type="button" className="repo-item-head" onClick={() => setPreviewId(open ? null : l.id)}>
-                    <span>
-                      <strong>{l.title}</strong>
-                    </span>
-                    <span className="muted">Của {owner?.name ?? 'Không rõ'}</span>
-                  </button>
-                  {open ? (
-                    <div className="repo-item-body">
-                      {l.html ? (
-                        <HtmlLessonPlayer html={l.html} title={l.title} />
-                      ) : (
-                        <LessonPlayer lesson={l} />
-                      )}
-                      <button type="button" className="btn btn-secondary" onClick={() => copyToMine(l)}>
-                        Copy về không gian của tôi
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }

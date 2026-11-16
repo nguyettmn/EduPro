@@ -1,6 +1,6 @@
-// Lesson detail: Nội dung / Luyện tập / Game. Reached from Soạn bài
-// (Pack tab) or from the student's Space. Pack browsing lives in Studio.
-import type { Account, Lesson } from '../types';
+// Lesson detail: Nội dung / Luyện tập / Game. Reached from Kho bài chuẩn
+// or from the student's Space.
+import type { Account, Lesson, ViewId } from '../types';
 import { QUESTIONS } from '../data/questions';
 import { canDo } from '../permissions';
 import { REFERENCE, useStore } from '../state/store';
@@ -16,11 +16,13 @@ function LessonDetail({
   lesson,
   account,
   tab,
+  from,
   go,
 }: {
   lesson: Lesson;
   account: Account;
   tab: 'content' | 'practice' | 'game';
+  from?: ViewId;
   go: (route: Route) => void;
 }) {
   const { dispatch } = useStore();
@@ -29,7 +31,7 @@ function LessonDetail({
   const isHtml = lesson.html !== undefined && lesson.html !== '';
   const isStudent = canDo(account, 'useTutor');
   const setTab = (next: 'content' | 'practice' | 'game') =>
-    go({ view: 'lesson', lessonId: lesson.id, tab: next });
+    go({ view: 'lesson', lessonId: lesson.id, tab: next, ...(from ? { from } : {}) });
 
   const copyToMySpace = () => {
     const copy: Lesson = {
@@ -48,9 +50,13 @@ function LessonDetail({
       <button
         type="button"
         className="btn btn-ghost"
-        onClick={() => go(isStudent ? { view: 'assignments' } : { view: 'studio' })}
+        onClick={() => go({ view: from ?? (isStudent ? 'assignments' : 'studio') })}
       >
-        {isStudent ? '← Quay lại Space' : '← Quay lại Soạn bài'}
+        {from === 'kho'
+          ? '← Quay lại Kho bài chuẩn'
+          : isStudent
+            ? '← Quay lại Space'
+            : '← Quay lại Soạn bài'}
       </button>
       <div className="lesson-detail-head" style={{ borderTopColor: lesson.color }}>
         <h2>{lesson.title}</h2>
@@ -140,5 +146,5 @@ export function LibraryView({
   // Copies are assignable, so a lesson detail lookup must find copies too.
   const lesson = route.lessonId ? state.lessons.find((l) => l.id === route.lessonId) : undefined;
   if (!lesson) return <EmptyState text="Không tìm thấy bài học." />;
-  return <LessonDetail lesson={lesson} account={account} tab={route.tab ?? 'content'} go={go} />;
+  return <LessonDetail lesson={lesson} account={account} tab={route.tab ?? 'content'} from={route.from} go={go} />;
 }
