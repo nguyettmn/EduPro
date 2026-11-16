@@ -97,7 +97,9 @@ export function LessonGamesSection({
       <p className="guide-text">
         {isTutorContext
           ? 'Game em tự tạo bằng AI hoặc tải lên. Chỉ em xem được các game này.'
-          : 'Một bài học có thể có nhiều game. Chơi ngay tại đây, hoặc tạo game mới gắn vào bài này.'}
+          : isStudent
+            ? 'Một bài học có thể có nhiều game. Chơi ngay tại đây.'
+            : 'Một bài học có thể có nhiều game. Chơi ngay tại đây, hoặc tạo game mới gắn vào bài này.'}
       </p>
       {notice ? <p className="notice">{notice}</p> : null}
       {importErrors.map((e, i) => (
