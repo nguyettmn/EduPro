@@ -218,6 +218,7 @@ function AssignSheet({
 interface Filing {
   grade: number | null;
   subject: string | null;
+  topic: string | null;
   gradeKey: string;
   gradeLabel: string;
   gradeSort: number;
@@ -239,6 +240,7 @@ function filingOf(lesson: Lesson): Filing {
   return {
     grade,
     subject,
+    topic,
     gradeKey: grade !== null ? `g${grade}` : 'gx',
     gradeLabel: grade !== null ? `Khối ${grade}` : 'Chưa xếp khối',
     gradeSort: grade ?? 99,
@@ -304,6 +306,19 @@ function groupMine(lessons: Lesson[]): GradeGroup[] {
     }
   }
   return grades;
+}
+
+/** The lesson with its effective filing applied, so the editor fields
+ * show the same Khối/Môn/Topic the list groups the lesson under
+ * (Pack copies inherit the Pack's filing until explicitly changed). */
+function withEffectiveFiling(lesson: Lesson): Lesson {
+  const f = filingOf(lesson);
+  return {
+    ...lesson,
+    grade: f.grade ?? undefined,
+    subject: f.subject ?? undefined,
+    topic: f.topic ?? undefined,
+  };
 }
 
 /** Grade/subject/Topic filing fields for the lesson editor. Changing them
@@ -423,6 +438,7 @@ export function StudioShell({
     () => subjectsFor(account.teachingProfile, gradesFor(account.teachingProfile)[0] ?? 5)[0] ?? 'Toán',
   );
   const [marketPreviewId, setMarketPreviewId] = useState<string | null>(null);
+  const [marketNotice, setMarketNotice] = useState<string | null>(null);
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [aiPrefill, setAiPrefill] = useState<{ topic: string; grade: number; subject: string } | null>(null);
   const [aiPrefillNonce, setAiPrefillNonce] = useState(0);
@@ -880,7 +896,7 @@ export function StudioShell({
               <EmptyState text="Chọn một bài bên trái để sửa, hoặc tạo bài mới." />
             ) : draft.html ? (
               <>
-                <FilingFields draft={draft} onChange={patchDraft} topics={myTopics} />
+                <FilingFields draft={withEffectiveFiling(draft)} onChange={patchDraft} topics={myTopics} />
                 <p className="guide-text">
                   Bài HTML do AI soạn — xem trước bên dưới. Muốn sửa nội dung, hãy soạn lại bằng AI;
                   bản khung này chưa sửa trực tiếp file HTML.
@@ -929,7 +945,7 @@ export function StudioShell({
                   <span>Tiêu đề bài học</span>
                   <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
                 </label>
-                <FilingFields draft={draft} onChange={patchDraft} topics={myTopics} />
+                <FilingFields draft={withEffectiveFiling(draft)} onChange={patchDraft} topics={myTopics} />
                 {draft.sections.map((section, i) => (
                   <div key={section.id} className="section-editor">
                     <div className="section-editor-head">
@@ -1117,6 +1133,7 @@ export function StudioShell({
                   soạn cùng AI đều được ghi rõ. Bản demo chưa có thanh toán và đăng bán — bài miễn phí thì lấy
                   về dùng ngay được.
                 </p>
+                {marketNotice ? <p className="notice">{marketNotice}</p> : null}
                 <div className="lesson-grid">
                   {MARKETPLACE_ITEMS.map((item) => {
                     const open = marketPreviewId === item.id;
@@ -1171,7 +1188,7 @@ export function StudioShell({
                               type="button"
                               className="btn btn-small btn-primary"
                               onClick={() =>
-                                setNotice(
+                                setMarketNotice(
                                   'Bản demo chưa có thanh toán. Bạn có thể xem trước nội dung, còn mua bán thật sẽ mở khi có backend và thanh toán.',
                                 )
                               }

@@ -321,6 +321,43 @@ export const LESSON_COPIES: Lesson[] = [
     ownerId: 'u-teacher-a',
     sourceId: 'L2',
   },
+  // Sample HTML lesson (the shape AI composing produces) so the HTML
+  // flows — preview, exercises, export, assign — can be tried without
+  // an API key. Clearly labelled; the teacher can delete it.
+  {
+    id: 'LC-HTML1',
+    title: '[Mẫu] So sánh phân số — bài HTML',
+    topicIds: [],
+    color: '#2563eb',
+    sections: [],
+    questionIds: [],
+    ownerId: 'u-teacher-a',
+    grade: 5,
+    subject: 'Toán',
+    topic: 'Phân số',
+    html: `<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>So sánh phân số</title>
+<style>body{font-family:sans-serif;max-width:640px;margin:24px auto;padding:0 16px;color:#1e293b}h1{color:#2563eb}.card{border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:12px 0}.frac{display:inline-flex;flex-direction:column;text-align:center;vertical-align:middle}.frac span{padding:0 6px}.frac span:first-child{border-bottom:2px solid #1e293b}button{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer}#ans{display:none;margin-top:8px;color:#059669;font-weight:700}</style>
+</head>
+<body>
+<h1>So sánh phân số</h1>
+<p>Bài mẫu dạng HTML. Bài này học cách so sánh hai phân số bằng hình vẽ.</p>
+<div class="card">
+<h2>1. Nhìn hình để so sánh</h2>
+<p>Thanh thứ nhất tô <span class="frac"><span>3</span><span>4</span></span>, thanh thứ hai tô <span class="frac"><span>2</span><span>3</span></span>. Thanh nào tô nhiều hơn?</p>
+<button onclick="document.getElementById('ans').style.display='block'">Hiện đáp án</button>
+<p id="ans">Thanh thứ nhất tô nhiều hơn: 3/4 lớn hơn 2/3.</p>
+</div>
+<div class="card">
+<h2>2. Kiểm tra bằng quy đồng</h2>
+<p>Quy đồng về mẫu số 12: 3/4 = 9/12 và 2/3 = 8/12. Vì 9 lớn hơn 8 nên 3/4 lớn hơn 2/3.</p>
+</div>
+</body>
+</html>`,
+  },
 ];
 
 // ---------- Games ----------

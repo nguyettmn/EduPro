@@ -348,29 +348,29 @@ export function BatchPlanner({
               </div>
             ))}
           </div>
-          <div className="inline-add">
-            <label className="field">
-              <span>Thêm bài bằng tay</span>
-              <input
-                value={manualTitle}
-                onChange={(e) => setManualTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addManual();
-                  }
-                }}
-                placeholder="Tên bài học…"
-              />
-            </label>
-            <button type="button" className="btn btn-secondary" onClick={addManual}>
-              Thêm bài
-            </button>
-          </div>
         </div>
       ) : (
-        <EmptyState text="Chưa có khung chương trình nào. Tải tài liệu lên và bấm phân tích, hoặc thêm bài bằng tay sau khi có khung." />
+        <EmptyState text="Chưa có khung chương trình nào. Tải tài liệu lên và bấm phân tích, hoặc thêm bài bằng tay ở dưới." />
       )}
+      <div className="inline-add">
+        <label className="field">
+          <span>Thêm bài bằng tay</span>
+          <input
+            value={manualTitle}
+            onChange={(e) => setManualTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addManual();
+              }
+            }}
+            placeholder="Tên bài học…"
+          />
+        </label>
+        <button type="button" className="btn btn-secondary" onClick={addManual}>
+          Thêm bài
+        </button>
+      </div>
     </div>
   );
 }
