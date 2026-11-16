@@ -339,7 +339,9 @@ export function GameStudio({ account, route, go }: { account: Account; route: Ro
   };
 
   const goBack = () => {
-    if (route.from === 'lesson' && route.lessonId) {
+    if (route.from === 'assignments' && route.assignmentId) {
+      go({ view: 'assignments', assignmentId: route.assignmentId });
+    } else if (route.from === 'lesson' && route.lessonId) {
       go({ view: 'lesson', lessonId: route.lessonId, tab: 'content' });
     } else if (route.from === 'tutor') {
       go({ view: 'tutor', studentId: account.id });

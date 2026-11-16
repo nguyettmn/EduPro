@@ -4,7 +4,7 @@
 // Play is open to anyone viewing the lesson; edit/delete belong to the
 // game owner only (managers never edit someone else's original).
 import { useRef, useState } from 'react';
-import type { Account, HtmlGame, Lesson } from '../types';
+import type { Account, HtmlGame, Lesson, ViewId } from '../types';
 import { canDo } from '../permissions';
 import { useStore } from '../state/store';
 import type { Route } from '../route';
@@ -17,11 +17,17 @@ export function LessonGamesSection({
   account,
   lesson,
   go,
+  from,
+  assignmentId,
 }: {
   account: Account;
   /** The lesson the games attach to; null = the student's own Tutor Space games. */
   lesson: Lesson | null;
   go: (route: Route) => void;
+  /** View the game studio returns to; defaults to the lesson detail page. */
+  from?: ViewId;
+  /** Assignment the studio returns to when `from` is 'assignments'. */
+  assignmentId?: string;
 }) {
   const { state, dispatch } = useStore();
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -43,8 +49,9 @@ export function LessonGamesSection({
     } else {
       go({
         view: 'gamestudio',
-        from: 'lesson',
+        from: from ?? 'lesson',
         lessonId: lesson!.id,
+        ...(assignmentId ? { assignmentId } : {}),
         ...(gameId ? { gameId } : {}),
       });
     }

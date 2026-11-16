@@ -11,6 +11,7 @@ import type { Route } from '../route';
 import { QuizRunner } from './QuizRunner';
 import { HtmlLessonPlayer } from './HtmlLessonPlayer';
 import { LessonExerciseSets } from './ExerciseRunner';
+import { LessonGamesSection } from './LessonGamesSection';
 import { dueLabel, EmptyState, SectionBand, formatDate } from './ui';
 
 const todayIso = (): string => new Date().toISOString().slice(0, 10);
@@ -60,6 +61,7 @@ export function SpaceView({
           </p>
           <HtmlLessonPlayer html={lesson.html} title={selected.title} />
           <LessonExerciseSets lessonId={lesson.id} />
+          <LessonGamesSection account={account} lesson={lesson} go={go} from="assignments" assignmentId={selected.id} />
         </div>
       );
     }
@@ -89,6 +91,9 @@ export function SpaceView({
           >
             Xem lại bài học
           </button>
+          {lesson ? (
+            <LessonGamesSection account={account} lesson={lesson} go={go} from="assignments" assignmentId={selected.id} />
+          ) : null}
         </div>
       );
     }
@@ -123,6 +128,9 @@ export function SpaceView({
           }}
           onExit={() => go({ view: 'assignments' })}
         />
+        {lesson ? (
+          <LessonGamesSection account={account} lesson={lesson} go={go} from="assignments" assignmentId={selected.id} />
+        ) : null}
       </div>
     );
   }
