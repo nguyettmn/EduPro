@@ -77,7 +77,7 @@ export function Dashboard({ account, go }: { account: Account; go: (route: Route
       attention.push({
         key: `grade-${s.id}`,
         label: `Chấm bài của ${accountName(state.accounts, s.studentId)} — ${s.score} trên ${s.total}`,
-        route: { view: 'classes', assignmentId: s.assignmentId, classId: assignment.classId },
+        route: { view: 'classes', assignmentId: s.assignmentId, classId: assignment.classId, studentId: s.studentId },
       });
     }
     for (const a of myAssignments.filter((x) => x.status === 'active' && daysUntil(x.dueDate) <= 0)) {

@@ -1,4 +1,6 @@
-// Browser client for POST /api/ai-soan-bai (SSE stream).
+// Browser client for POST /api/ai-soan-bai: SSE stream for lesson
+// stages (propose/generate/revise), one plain JSON response for the
+// plan/exercises stages.
 import type { AiRequestBody } from './apiTypes';
 
 export class AiApiError extends Error {
@@ -7,6 +9,43 @@ export class AiApiError extends Error {
     super(message);
     this.code = code;
   }
+}
+
+/** Call a JSON stage (plan / exercises) and return its `data` payload. */
+export async function callAiJson<T>(
+  body: AiRequestBody,
+  opts: { signal?: AbortSignal } = {},
+): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch('/api/ai-soan-bai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: opts.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
+    throw new AiApiError(
+      'network',
+      'Không kết nối được tới máy chủ AI. Hãy kiểm tra mạng rồi thử lại.',
+    );
+  }
+  let data: unknown = null;
+  try {
+    data = await res.json();
+  } catch {
+    // Fall through to the generic error below.
+  }
+  if (!res.ok) {
+    const d = (data ?? {}) as { error?: string; message?: string };
+    throw new AiApiError(d.error ?? 'server_error', d.message ?? `Máy chủ trả lỗi ${res.status}. Hãy thử lại.`);
+  }
+  const d = (data ?? {}) as { ok?: boolean; data?: T };
+  if (!d.ok || d.data === undefined) {
+    throw new AiApiError('server_error', 'Máy chủ trả về kết quả không đúng định dạng. Hãy thử lại.');
+  }
+  return d.data;
 }
 
 export type AiStageResult =
@@ -98,6 +137,10 @@ export async function callAiSoanBai(
                 text: typeof event.text === 'string' ? event.text : '',
                 warnings: Array.isArray(event.warnings) ? (event.warnings as string[]) : [],
               };
+            }
+            // JSON stages (plan/exercises) never use this SSE client.
+            if (body.stage !== 'generate' && body.stage !== 'revise') {
+              throw new AiApiError('server_error', 'Máy chủ trả về kết quả không đúng định dạng.');
             }
             return {
               stage: body.stage,

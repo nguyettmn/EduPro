@@ -77,7 +77,7 @@ interface ChatTurn {
 }
 
 interface AiRequestBody {
-  stage: 'propose' | 'generate' | 'revise';
+  stage: 'propose' | 'generate' | 'revise' | 'plan' | 'exercises';
   grade: number;
   subject: string;
   roleSentence: string;
@@ -91,6 +91,10 @@ interface AiRequestBody {
   currentHtml?: string;
   history?: ChatTurn[];
   instruction?: string;
+  /** Exercises only: plain text extracted from the lesson HTML. */
+  lessonText?: string;
+  /** Exercises only: how many questions to generate (1–20). */
+  exerciseCount?: number;
 }
 
 // ---------- Handler argument types ----------
@@ -398,6 +402,64 @@ ${input.instruction.trim()}
 Dựa vào tất cả các phần trên, hãy xuất lại MỘT file HTML hoàn chỉnh đã sửa theo yêu cầu. Nếu yêu cầu nào mơ hồ, hãy chọn cách hợp lý nhất và liệt kê các giả định trong comment HTML ở đầu file. Không hỏi lại — hãy xuất bài học.`;
 }
 
+/** Batch-planning prompt: NAMES ONLY. The teacher curates the names and
+ * composes each lesson afterwards; Topic grouping happens in "Bài của
+ * tôi", never here (user decision 2026-11-16). JSON output only. */
+function buildPlanPrompt(input: LessonPromptInput): string {
+  const outlineText = input.outline.trim() !== '' ? input.outline.trim() : '(không có đề cương)';
+  return `${input.roleSentence.trim()}
+
+Bạn đang lập khung chương trình cho học sinh Khối ${input.grade}, môn ${input.subject}. Ngôn ngữ: Tiếng Việt.
+
+Nhiệm vụ: CHỈ liệt kê TÊN các bài học, theo đúng thứ tự dạy. Không soạn nội dung, không viết dàn ý chi tiết, không gom theo Topic.
+
+Quy tắc:
+- Tên bài bám sát đề cương và tài liệu dưới đây. Không bịa thêm chủ đề ngoài tài liệu.
+- Nếu không có đề cương và tài liệu, hãy lập khung từ chương trình chuẩn của Khối ${input.grade} môn ${input.subject}, giữ tên bài ở mức khái quát.
+- Từ 4 đến 20 bài. Mỗi tên bài ngắn gọn, rõ nghĩa, đúng thuật ngữ sách giáo khoa.
+- Xuất ĐÚNG định dạng JSON sau, không thêm chữ nào khác:
+{"lessons": [{"title": "Tên bài 1"}, {"title": "Tên bài 2"}]}
+
+<DE_CUONG>
+${outlineText}
+</DE_CUONG>
+
+<TAI_LIEU>
+${materialsBlock(input.attachments)}
+</TAI_LIEU>`;
+}
+
+/** Exercise-generation prompt: structured JSON questions built ONLY from
+ * the approved lesson text. The teacher reviews and edits every question
+ * before saving; nothing here is graded automatically by the app. */
+function buildExercisesPrompt(input: {
+  grade: number;
+  subject: string;
+  roleSentence: string;
+  topic: string;
+  lessonText: string;
+  count: number;
+}): string {
+  return `${input.roleSentence.trim()}
+
+Bạn đang ra bài tập cho học sinh Khối ${input.grade}, môn ${input.subject}, dựa DUY NHẤT vào nội dung bài học dưới đây. Ngôn ngữ: Tiếng Việt.
+
+Quy tắc:
+- Đúng ${input.count} câu, sắp xếp từ dễ đến khó.
+- Mọi câu hỏi và đáp án phải lấy từ nội dung bài học trong <BAI_HOC>. Không bịa kiến thức ngoài bài, không hỏi điều bài không dạy.
+- Câu trắc nghiệm (kind "choice"): 3–4 lựa chọn, ĐÚNG MỘT đáp án đúng, các lựa chọn sai phải hợp lý (lỗi học sinh hay mắc), không dùng mẹo "tất cả đều đúng".
+- Câu trả lời ngắn (kind "short"): đáp án đúng ngắn gọn (một số, một từ, một cụm từ), học sinh gõ đúng đáp án đó mới được tính đúng.
+- Xen kẽ hai dạng. Không tạo game, không tạo ô chữ hay đua xe.
+- Xuất ĐÚNG định dạng JSON sau, không thêm chữ nào khác:
+{"questions": [{"kind": "choice", "prompt": "...", "choices": ["...", "...", "..."], "answerIndex": 0, "hint": "..."}, {"kind": "short", "prompt": "...", "expected": "...", "hint": "..."}]}
+
+Chủ đề bài học: ${input.topic.trim() !== '' ? input.topic.trim() : '(không ghi chủ đề)'}
+
+<BAI_HOC>
+${input.lessonText}
+</BAI_HOC>`;
+}
+
 /** Errors whose message is safe and useful to show the teacher as-is
  * (bad files, size limits). Anything else goes through the classifiers. */
 class UserError extends Error {}
@@ -695,6 +757,146 @@ async function callGeminiStream(args: {
   return { text: full, finishReason };
 }
 
+// ---------- Gemini REST, JSON stages (plan / exercises) ----------
+// Non-streaming: the model must return one JSON document. The caller
+// validates the shape and retries once with the problem named.
+
+interface GeminiJsonResponse {
+  candidates?: { content?: { parts?: { text?: string }[] } }[];
+}
+
+async function callGeminiJson(args: {
+  apiKey: string;
+  model: string;
+  parts: GeminiPart[];
+  maxOutputTokens: number;
+}): Promise<string> {
+  const url = `${GEMINI_API_BASE}/${encodeURIComponent(args.model)}:generateContent`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': args.apiKey },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: args.parts }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          maxOutputTokens: args.maxOutputTokens,
+        },
+      }),
+      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'TimeoutError') {
+      throw new GeminiError(
+        'timeout',
+        'Gemini trả lời quá chậm (quá 280 giây). Hãy thử lại với tài liệu ngắn hơn.',
+      );
+    }
+    throw new GeminiError('network', 'Không kết nối được tới Gemini. Hãy kiểm tra mạng rồi thử lại.');
+  }
+  if (!res.ok) {
+    throw await geminiErrorFromResponse(res);
+  }
+  const data = (await res.json()) as GeminiJsonResponse;
+  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+  if (text.trim() === '') {
+    throw new GeminiError('generation_failed', 'Gemini trả về kết quả rỗng. Hãy thử lại.');
+  }
+  return text;
+}
+
+/** Thrown when the model's JSON fails shape validation; the message names
+ * the problem so the retry prompt can ask for a fix. */
+class BadAiOutput extends Error {}
+
+function parseJsonObject(raw: string): Record<string, unknown> {
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+  const parsed: unknown = JSON.parse(cleaned);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new BadAiOutput('Kết quả không phải một đối tượng JSON.');
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function validatePlanJson(raw: string): { lessons: { title: string }[] } {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = parseJsonObject(raw);
+  } catch {
+    throw new BadAiOutput('Kết quả không phải JSON hợp lệ.');
+  }
+  const lessons = parsed.lessons;
+  if (!Array.isArray(lessons) || lessons.length === 0) {
+    throw new BadAiOutput('Thiếu danh sách lessons.');
+  }
+  const seen = new Set<string>();
+  const titles: { title: string }[] = [];
+  for (const item of lessons) {
+    if (typeof item !== 'object' || item === null) continue;
+    const title = typeof (item as Record<string, unknown>).title === 'string'
+      ? ((item as Record<string, unknown>).title as string).trim()
+      : '';
+    if (title === '') continue;
+    const key = title.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    titles.push({ title });
+  }
+  if (titles.length === 0) {
+    throw new BadAiOutput('Danh sách lessons trống hoặc không có tên bài hợp lệ.');
+  }
+  return { lessons: titles.slice(0, 30) };
+}
+
+interface ValidatedExercise {
+  kind: 'choice' | 'short';
+  prompt: string;
+  choices?: string[];
+  answerIndex?: number;
+  expected?: string;
+  hint?: string;
+}
+
+function validateExercisesJson(raw: string): { questions: ValidatedExercise[] } {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = parseJsonObject(raw);
+  } catch {
+    throw new BadAiOutput('Kết quả không phải JSON hợp lệ.');
+  }
+  const questions = parsed.questions;
+  if (!Array.isArray(questions) || questions.length === 0) {
+    throw new BadAiOutput('Thiếu danh sách questions.');
+  }
+  const out: ValidatedExercise[] = [];
+  for (const item of questions) {
+    if (typeof item !== 'object' || item === null) continue;
+    const q = item as Record<string, unknown>;
+    const kind = q.kind;
+    const prompt = typeof q.prompt === 'string' ? q.prompt.trim() : '';
+    if (prompt === '' || (kind !== 'choice' && kind !== 'short')) continue;
+    const hint = typeof q.hint === 'string' && q.hint.trim() !== '' ? q.hint.trim() : undefined;
+    if (kind === 'choice') {
+      const choices = Array.isArray(q.choices)
+        ? q.choices.filter((c): c is string => typeof c === 'string' && c.trim() !== '').map((c) => c.trim())
+        : [];
+      const answerIndex = typeof q.answerIndex === 'number' ? q.answerIndex : -1;
+      if (choices.length < 3 || choices.length > 4) continue;
+      if (!Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex >= choices.length) continue;
+      out.push({ kind, prompt, choices, answerIndex, hint });
+    } else {
+      const expected = typeof q.expected === 'string' ? q.expected.trim() : '';
+      if (expected === '') continue;
+      out.push({ kind, prompt, expected, hint });
+    }
+  }
+  if (out.length === 0) {
+    throw new BadAiOutput('Không có câu hỏi nào đúng định dạng.');
+  }
+  return { questions: out.slice(0, 20) };
+}
+
 // ---------- Output validation (the automated checks) ----------
 
 /** Pull the HTML document out of the raw model output. Models sometimes
@@ -766,6 +968,11 @@ function sendJson(res: NodeRes, status: number, code: string, message: string): 
   res.end(JSON.stringify({ error: code, message }));
 }
 
+function sendOk(res: NodeRes, payload: unknown): void {
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(payload));
+}
+
 /** Read the request body. Vercel's Node runtime may pre-parse JSON into
  * req.body; otherwise the raw stream is still readable. Both paths are
  * handled so this works either way. */
@@ -786,6 +993,86 @@ async function readRequestBody(req: NodeReq): Promise<string> {
     chunks.push(buf);
   }
   return Buffer.concat(chunks).toString('utf-8');
+}
+
+/** JSON stages (plan / exercises): one non-streaming call, one retry on
+ * shape violations, then a plain JSON response. */
+async function handleJsonStage(
+  body: AiRequestBody,
+  apiKey: string,
+  model: string,
+  res: NodeRes,
+): Promise<void> {
+  try {
+    let promptText: string;
+    let media: GeminiPart[] = [];
+    let maxOutputTokens: number;
+    let validate: (raw: string) => unknown;
+    if (body.stage === 'plan') {
+      const prepared = await prepareAttachments(body.attachments ?? []);
+      media = prepared.media;
+      promptText = buildPlanPrompt({
+        grade: body.grade,
+        subject: body.subject,
+        roleSentence: body.roleSentence,
+        mode: body.mode,
+        topic: body.topic,
+        outline: body.outline,
+        extraRequests: body.extraRequests,
+        attachments: prepared.notes,
+      });
+      maxOutputTokens = 4096;
+      validate = validatePlanJson;
+    } else {
+      promptText = buildExercisesPrompt({
+        grade: body.grade,
+        subject: body.subject,
+        roleSentence: body.roleSentence,
+        topic: body.topic,
+        lessonText: body.lessonText ?? '',
+        count: body.exerciseCount ?? 8,
+      });
+      maxOutputTokens = 8192;
+      validate = validateExercisesJson;
+    }
+
+    let lastProblem = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const textPart =
+        attempt === 0
+          ? promptText
+          : `${promptText}\n\nLƯU Ý SỬA LỖI: lần trước output sai định dạng (${lastProblem}). Chỉ xuất JSON đúng định dạng đã dặn, không thêm chữ nào khác.`;
+      const raw = await callGeminiJson({
+        apiKey,
+        model,
+        parts: [{ text: textPart }, ...media],
+        maxOutputTokens,
+      });
+      try {
+        const data = validate(raw);
+        sendOk(res, { ok: true, stage: body.stage, data });
+        return;
+      } catch (err) {
+        if (!(err instanceof BadAiOutput)) throw err;
+        lastProblem = err.message;
+      }
+    }
+    sendJson(
+      res,
+      422,
+      'bad_ai_output',
+      'AI trả về kết quả sai định dạng dù đã thử lại. Hãy thử lại lần nữa hoặc rút ngắn tài liệu.',
+    );
+  } catch (err) {
+    console.error('ai-soan-bai json stage failed:', err);
+    if (err instanceof UserError) {
+      sendJson(res, 400, 'bad_input', err.message);
+    } else if (err instanceof GeminiError) {
+      sendJson(res, 502, err.code, err.message);
+    } else {
+      sendJson(res, 500, 'generation_failed', 'Không tạo được kết quả. Hãy thử lại.');
+    }
+  }
 }
 
 export default async function handler(req: NodeReq, res: NodeRes): Promise<void> {
@@ -823,7 +1110,7 @@ export default async function handler(req: NodeReq, res: NodeRes): Promise<void>
     return;
   }
 
-  if (!['propose', 'generate', 'revise'].includes(body.stage)) {
+  if (!['propose', 'generate', 'revise', 'plan', 'exercises'].includes(body.stage)) {
     sendJson(res, 400, 'bad_stage', 'Thiếu hoặc sai trường stage.');
     return;
   }
@@ -839,8 +1126,24 @@ export default async function handler(req: NodeReq, res: NodeRes): Promise<void>
     sendJson(res, 400, 'bad_input', 'Sửa bài cần có file hiện tại và yêu cầu sửa.');
     return;
   }
+  if (
+    body.stage === 'exercises' &&
+    (!body.lessonText?.trim() ||
+      !Number.isInteger(body.exerciseCount) ||
+      (body.exerciseCount ?? 0) < 1 ||
+      (body.exerciseCount ?? 0) > 20)
+  ) {
+    sendJson(res, 400, 'bad_input', 'Tạo bài tập cần nội dung bài học và số câu từ 1 đến 20.');
+    return;
+  }
 
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+
+  // JSON stages answer with one plain JSON response, not an SSE stream.
+  if (body.stage === 'plan' || body.stage === 'exercises') {
+    await handleJsonStage(body, apiKey, model, res);
+    return;
+  }
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',

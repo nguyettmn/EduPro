@@ -4,13 +4,13 @@
 // "Bài của tôi". The prompt is assembled server-side from the same fields
 // (see api/ai-soan-bai.ts); the browser never sees the API key.
 //
-// Deferred for later: batch syllabus planning (Lên chương trình) and
-// proposing HTML lessons to Kho chung.
+// Deferred for later: proposing HTML lessons to Kho chung.
 import { useRef, useState } from 'react';
 import type { Account, Lesson } from '../types';
 import { gradesFor, roleSentenceFor, subjectsFor } from '../ai/subjects';
 import type { AiRequestBody, AuthorMode, ChatTurn, WireAttachment } from '../ai/apiTypes';
 import { AiApiError, callAiSoanBai } from '../ai/client';
+import { downloadTextFile, embedSourceJson, safeFilename } from '../ai/lessonFile';
 import { useStore } from '../state/store';
 import { SectionBand } from './ui';
 import { HtmlLessonPlayer } from './HtmlLessonPlayer';
@@ -60,25 +60,36 @@ export function AiStudio({
   account,
   onSaved,
   onOpenSettings,
+  initialTopic,
+  initialGrade,
+  initialSubject,
 }: {
   account: Account;
   onSaved: (lessonId: string) => void;
   onOpenSettings: () => void;
+  /** Prefill from the batch planner: compose this lesson next. */
+  initialTopic?: string;
+  initialGrade?: number;
+  initialSubject?: string;
 }) {
   const { dispatch } = useStore();
   // Grade/subject pickers are scoped by the teacher's Hồ sơ giảng dạy
   // when set; otherwise the full master lists are offered.
   const profile = account.teachingProfile;
   const gradeOptions = gradesFor(profile);
-  const initialGrade = gradeOptions[0] ?? 5;
-  const initialSubject = subjectsFor(profile, initialGrade)[0] ?? 'Toán';
-  const [grade, setGrade] = useState(initialGrade);
-  const [subject, setSubject] = useState(initialSubject);
-  const [customSubject, setCustomSubject] = useState('');
-  const [roleSentence, setRoleSentence] = useState(() => roleSentenceFor(initialGrade, initialSubject));
+  const resolvedGrade = initialGrade ?? gradeOptions[0] ?? 5;
+  const resolvedSubject = initialSubject ?? subjectsFor(profile, resolvedGrade)[0] ?? 'Toán';
+  const subjectOptions = subjectsFor(profile, resolvedGrade);
+  const subjectIsListed = subjectOptions.includes(resolvedSubject);
+  const [grade, setGrade] = useState(resolvedGrade);
+  const [subject, setSubject] = useState(subjectIsListed ? resolvedSubject : CUSTOM_SUBJECT);
+  const [customSubject, setCustomSubject] = useState(subjectIsListed ? '' : resolvedSubject);
+  const [roleSentence, setRoleSentence] = useState(() =>
+    roleSentenceFor(resolvedGrade, resolvedSubject),
+  );
   const [roleEdited, setRoleEdited] = useState(false);
-  const [mode, setMode] = useState<AuthorMode>('outline');
-  const [topic, setTopic] = useState('');
+  const [mode, setMode] = useState<AuthorMode>(initialTopic ? 'topic' : 'outline');
+  const [topic, setTopic] = useState(initialTopic ?? '');
   const [outline, setOutline] = useState('');
   const [extraRequests, setExtraRequests] = useState('');
   const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
@@ -276,6 +287,10 @@ export function AiStudio({
       html: current.html,
       grade,
       subject: effectiveSubject,
+      topic: topic.trim() !== '' ? topic.trim() : undefined,
+      outline: outline.trim() !== '' ? outline.trim() : undefined,
+      roleSentence: roleSentence.trim() !== '' ? roleSentence.trim() : undefined,
+      extraRequests: extraRequests.trim() !== '' ? extraRequests.trim() : undefined,
     };
     dispatch({ type: 'CREATE_LESSON_COPY', lesson });
     onSaved(lesson.id);
@@ -283,13 +298,20 @@ export function AiStudio({
 
   const downloadHtml = () => {
     if (!current) return;
-    const name = (current.title !== '' ? current.title : 'bai-hoc').replace(/[\\/:*?"<>|]/g, '_');
-    const url = URL.createObjectURL(new Blob([current.html], { type: 'text/html;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${name}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const title = current.title !== '' ? current.title : topic.trim() !== '' ? topic.trim() : 'Bài học AI soạn';
+    const file = embedSourceJson(current.html, {
+      format: 'edupro-lesson',
+      version: 1,
+      title,
+      grade,
+      subject: effectiveSubject,
+      ...(topic.trim() !== '' ? { topic: topic.trim() } : {}),
+      ...(outline.trim() !== '' ? { outline: outline.trim() } : {}),
+      ...(roleSentence.trim() !== '' ? { roleSentence: roleSentence.trim() } : {}),
+      ...(extraRequests.trim() !== '' ? { extraRequests: extraRequests.trim() } : {}),
+      exportedAt: new Date().toISOString(),
+    });
+    downloadTextFile(safeFilename(title, 'html'), file, 'text/html;charset=utf-8');
   };
 
   const startNew = () => {

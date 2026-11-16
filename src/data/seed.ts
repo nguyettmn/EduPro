@@ -7,6 +7,7 @@ import type {
   GameDef,
   Lesson,
   LessonSection,
+  MarketplaceItem,
   Pack,
   Proposal,
   RepoItem,
@@ -649,3 +650,155 @@ export const TUTOR_DATA: Record<string, TutorData> = {
     bestScores: {},
   },
 };
+
+// ---------- Public marketplace ("Kho user nộp lên") ----------
+// Sample listings only. Deals are user-to-user and EduPro takes a small
+// marketplace fee (user decision 2026-11-15); no real payments exist in
+// the demo, so paid items can be previewed but not bought yet. Listings
+// made with AI assistance are labelled as such.
+
+export const MARKETPLACE_ITEMS: MarketplaceItem[] = [
+  {
+    id: 'MKT-1',
+    title: 'So sánh phân số bằng hình ảnh',
+    description:
+      'Hai thanh hình chữ nhật tô màu giúp học sinh thấy ngay phân số nào lớn hơn, trước khi học quy tắc quy đồng.',
+    grade: 5,
+    subject: 'Toán',
+    topic: 'Phân số',
+    sellerName: 'Cô Lan — Trường TH An Bình',
+    price: 0,
+    aiAssisted: false,
+    lesson: {
+      id: 'MKT-L1',
+      title: 'So sánh phân số bằng hình ảnh',
+      topicIds: [],
+      color: '#2563eb',
+      sections: [
+        {
+          id: 'MS1',
+          title: 'Nhìn hình, đoán phân số nào lớn hơn',
+          example: [
+            [{ k: 't', s: 'Thanh 1 tô ' }, { k: 'f', n: 3, d: 4 }, { k: 't', s: ' — thanh 2 tô ' }, { k: 'f', n: 2, d: 3 }, { k: 't', s: '. Thanh nào tô nhiều hơn?' }],
+          ],
+          steps: ['Vẽ hai thanh dài bằng nhau.', 'Tô màu theo từng phân số.', 'Phần tô dài hơn là phân số lớn hơn.'],
+          tip: 'Học sinh hay so sánh mẫu số thay vì nhìn phần được tô.',
+        },
+        {
+          id: 'MS2',
+          title: 'Kiểm tra bằng quy đồng',
+          example: [
+            [{ k: 'f', n: 3, d: 4 }, { k: 't', s: ' = ' }, { k: 'f', n: 9, d: 12 }, { k: 't', s: ' và ' }, { k: 'f', n: 2, d: 3 }, { k: 't', s: ' = ' }, { k: 'f', n: 8, d: 12 }],
+          ],
+          steps: ['Quy đồng hai phân số về cùng mẫu số.', 'So sánh tử số.', 'Kết quả phải khớp với hình đã vẽ.'],
+        },
+      ],
+      questionIds: [],
+      topic: 'Phân số',
+    },
+  },
+  {
+    id: 'MKT-2',
+    title: 'Đổi đơn vị đo độ dài',
+    description:
+      'Bảng đơn vị từ ki-lô-mét đến mi-li-mét, kèm mẹo nhớ "mỗi bước nhân hoặc chia 10". Bài do giáo viên soạn cùng AI và đã duyệt lại.',
+    grade: 5,
+    subject: 'Toán',
+    topic: 'Đo lường',
+    sellerName: 'Thầy Đức — Trường TH Bình Minh',
+    price: 20000,
+    aiAssisted: true,
+    lesson: {
+      id: 'MKT-L2',
+      title: 'Đổi đơn vị đo độ dài',
+      topicIds: [],
+      color: '#059669',
+      sections: [
+        {
+          id: 'MS1',
+          title: 'Thang đơn vị đo độ dài',
+          example: [[{ k: 't', s: 'km — hm — dam — m — dm — cm — mm' }]],
+          steps: ['Viết thang đơn vị theo thứ tự từ lớn đến bé.', 'Mỗi bước sang phải: nhân 10.', 'Mỗi bước sang trái: chia 10.'],
+        },
+        {
+          id: 'MS2',
+          title: 'Ví dụ đổi đơn vị',
+          example: [[{ k: 't', s: '2,5 km = 2500 m (đi 3 bước sang phải: nhân 1000)' }]],
+          steps: ['Đếm số bước giữa hai đơn vị.', 'Nhân hoặc chia cho 10 theo số bước.', 'Kiểm tra: đổi ngược lại phải ra số ban đầu.'],
+          tip: 'Lỗi hay gặp: đếm nhầm số bước khi có đơn vị dam.',
+        },
+      ],
+      questionIds: [],
+      topic: 'Đo lường',
+    },
+  },
+  {
+    id: 'MKT-3',
+    title: 'Đọc hiểu: Sự tích cây khế',
+    description:
+      'Bài đọc hiểu truyện cổ tích kèm 3 câu hỏi gợi mở về lòng tham và tình anh em, phù hợp tiết đọc mở rộng.',
+    grade: 2,
+    subject: 'Tiếng Việt',
+    topic: 'Đọc hiểu',
+    sellerName: 'Cô Hạnh — Trường TH An Bình',
+    price: 0,
+    aiAssisted: false,
+    lesson: {
+      id: 'MKT-L3',
+      title: 'Đọc hiểu: Sự tích cây khế',
+      topicIds: [],
+      color: '#7c3aed',
+      sections: [
+        {
+          id: 'MS1',
+          title: 'Đọc truyện',
+          example: [[{ k: 't', s: 'Ngày xưa, có hai anh em nhà kia. Người anh tham lam lấy hết ruộng vườn, chỉ để lại cho em một cây khế...' }]],
+          steps: ['Đọc thầm đoạn truyện.', 'Gạch chân từ khó hiểu.', 'Kể lại truyện bằng lời của em.'],
+        },
+        {
+          id: 'MS2',
+          title: 'Hỏi — đáp',
+          example: [[{ k: 't', s: 'Vì sao người em không lấy nhiều vàng? Em học được điều gì từ người em?' }]],
+          steps: ['Trả lời miệng trước, viết sau.', 'Trích dẫn câu trong truyện làm bằng chứng.', 'Nghe bạn trả lời rồi bổ sung.'],
+        },
+      ],
+      questionIds: [],
+      topic: 'Đọc hiểu',
+    },
+  },
+  {
+    id: 'MKT-4',
+    title: 'Cộng trong phạm vi 100 (không nhớ)',
+    description:
+      'Phép cộng hai chữ số bằng que tính và bảng chục — đơn vị, dành cho học sinh mới làm quen với cộng có hai chữ số.',
+    grade: 1,
+    subject: 'Toán',
+    topic: 'Số học',
+    sellerName: 'Cô Thu — Trường TH Bình Minh',
+    price: 15000,
+    aiAssisted: false,
+    lesson: {
+      id: 'MKT-L4',
+      title: 'Cộng trong phạm vi 100 (không nhớ)',
+      topicIds: [],
+      color: '#d97706',
+      sections: [
+        {
+          id: 'MS1',
+          title: 'Que tính và bảng chục — đơn vị',
+          example: [[{ k: 't', s: '34 + 25: 3 chục + 2 chục = 5 chục; 4 đơn vị + 5 đơn vị = 9 đơn vị.' }]],
+          steps: ['Xếp que tính thành chục và đơn vị.', 'Cộng chục với chục, đơn vị với đơn vị.', 'Đọc kết quả: 59.'],
+        },
+        {
+          id: 'MS2',
+          title: 'Đặt tính rồi tính',
+          example: [[{ k: 't', s: 'Đặt thẳng hàng chục với chục, đơn vị với đơn vị, rồi cộng từ phải sang trái.' }]],
+          steps: ['Viết số thẳng cột.', 'Cộng cột đơn vị trước.', 'Cộng cột chục sau.'],
+          tip: 'Nhắc học sinh đặt thẳng hàng trước khi cộng.',
+        },
+      ],
+      questionIds: [],
+      topic: 'Số học',
+    },
+  },
+];

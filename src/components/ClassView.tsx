@@ -59,17 +59,26 @@ function AnswerValue({ value, question }: { value: StudentAnswer | Answer; quest
 function GradingDetail({
   account,
   assignment,
+  initialStudentId,
   onBack,
 }: {
   account: Account;
   assignment: Assignment;
+  /** Deep link: open this student's submission first (from "Hôm nay"). */
+  initialStudentId?: string;
   onBack: () => void;
 }) {
   const { state, dispatch } = useStore();
   const lesson = state.lessons.find((l) => l.id === assignment.lessonId);
   const questions = QUESTIONS.filter((q) => lesson?.questionIds.includes(q.id));
   const submissions = state.submissions.filter((s) => s.assignmentId === assignment.id);
-  const [expandedId, setExpandedId] = useState<string | null>(submissions[0]?.id ?? null);
+  const [expandedId, setExpandedId] = useState<string | null>(() => {
+    if (initialStudentId) {
+      const named = submissions.find((s) => s.studentId === initialStudentId);
+      if (named) return named.id;
+    }
+    return submissions[0]?.id ?? null;
+  });
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const canGradeHere = canDo(account, 'grade') && account.classIds.includes(assignment.classId);
@@ -382,7 +391,15 @@ export function ClassView({
   };
 
   if (tab === 'assignments' && grading) {
-    return <GradingDetail account={account} assignment={grading} onBack={() => setGradingId(null)} />;
+    return (
+      <GradingDetail
+        key={`${grading.id}:${route.studentId ?? ''}`}
+        account={account}
+        assignment={grading}
+        initialStudentId={route.studentId}
+        onBack={() => setGradingId(null)}
+      />
+    );
   }
 
   return (

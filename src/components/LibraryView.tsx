@@ -7,6 +7,7 @@ import { REFERENCE, useStore } from '../state/store';
 import type { Route } from '../route';
 import { LessonPlayer } from './LessonPlayer';
 import { HtmlLessonPlayer } from './HtmlLessonPlayer';
+import { LessonExerciseSets } from './ExerciseRunner';
 import { QuizRunner } from './QuizRunner';
 import { GameView } from './GameView';
 import { EmptyState, TopicTag } from './ui';
@@ -74,7 +75,10 @@ function LessonDetail({
         ) : null}
       </div>
       {isHtml ? (
-        <HtmlLessonPlayer html={lesson.html!} title={lesson.title} />
+        <>
+          <HtmlLessonPlayer html={lesson.html!} title={lesson.title} />
+          <LessonExerciseSets lessonId={lesson.id} />
+        </>
       ) : (
         <>
       <div className="tabs" role="tablist">

@@ -67,20 +67,25 @@ thái đang chọn trong điều hướng.
   sơ. Trang chính liệt kê mọi việc cần xử lý, mỗi việc đều bấm vào được.
   Lớp học là nơi tạo lớp mới, thêm học sinh bằng email, xem học sinh, bài
   giao và chấm bài kèm đáp án của học sinh. Soạn bài là một không gian
-  duy nhất: bài của tôi, Pack, và bài trong phạm vi quản lý; giao bài ngay
-  từ bài học, cho cả lớp hoặc từng học sinh. Hồ sơ giữ hồ sơ giảng dạy
+  duy nhất: Bài của tôi (xếp theo khối → môn → Topic, dạng thu gọn/mở),
+  Soạn bài mới (AI), Lên chương trình (soạn hàng loạt), Kho bài chuẩn, và
+  bài trong phạm vi quản lý; giao bài ngay từ bài học, cho cả lớp hoặc
+  từng học sinh, và từ cuối trang xem nội dung bài. Hồ sơ giữ hồ sơ giảng dạy
   (khối và môn dạy, chọn trước để khỏi chọn lại mỗi lần soạn bài bằng AI).
 - Tổ trưởng, Hiệu trưởng, Admin: thêm mục Quản lý.
 - Học sinh: Trang chính, Space (tên lớp học của em, em tự đổi tên riêng),
   Tutor Space, Hồ sơ. Bài giao nằm trong Space; bài giao riêng chỉ hiện
   với học sinh được giao.
 
-## Nội dung mẫu: Pack Toán 5 – Phân số
+## Nội dung mẫu: Kho bài chuẩn — Toán 5 – Phân số
 
-Năm bài học, tám chủ đề (A đến H), 59 câu hỏi. Mọi đáp án đều được tính bằng
-máy trong lúc tạo ngân hàng câu hỏi, không gõ tay. Phân số luôn hiển thị
+Năm bài học, tám chủ đề (A đến H), 59 câu hỏi, nằm ở nhánh “Theo chương
+trình BGD” của Kho bài chuẩn (chọn Khối 5 · Toán). Mọi đáp án đều được tính
+bằng máy trong lúc tạo ngân hàng câu hỏi, không gõ tay. Phân số luôn hiển thị
 dạng xếp chồng (tử số ở trên, mẫu số ở dưới), không bao giờ viết dạng gạch
-chéo trong giao diện.
+chéo trong giao diện. Nhánh “Kho user nộp lên” là chợ công khai mẫu: vài bài
+đăng mẫu (miễn phí và có phí, bài soạn cùng AI được ghi rõ); bản demo chưa có
+thanh toán và đăng bán.
 
 ## AI Soạn bài (bản test)
 
@@ -94,8 +99,26 @@ quyền same-origin) và không bao giờ được chèn trực tiếp vào DOM 
 
 Prompt gồm hai lớp: lớp chất lượng cố định (hợp đồng output, quy tắc
 không-game, quy tắc hiển thị theo môn, quy tắc đúng) + dàn ý/tài liệu của
-giáo viên là nguồn sự thật duy nhất. Code lắp prompt nằm ở `src/ai/prompt.ts`
-và được dùng chung bởi function và giao diện.
+giáo viên là nguồn sự thật duy nhất. Code lắp prompt nằm TRONG file function
+`api/ai-soan-bai.ts` (file function phải tự chứa toàn bộ, không import file
+nội bộ khác — xem chú thích ở đầu file). File `src/ai/prompt.ts` còn sót lại
+là bản chết, không được dùng.
+
+Tab “Lên chương trình”: tải đề cương/tài liệu lên, AI phân tích và chỉ gợi ý
+TÊN các bài theo thứ tự dạy; giáo viên giữ/bỏ/thêm tay, bấm vào từng bài để
+sang bước soạn. Gom theo Topic làm trong “Bài của tôi”, không làm ở bước này.
+
+Bài tập: từ một bài HTML, giáo viên bấm “Tạo bài tập” để AI đọc nội dung bài
+và ra câu hỏi trắc nghiệm/trả lời ngắn dạng dữ liệu có cấu trúc; giáo viên
+duyệt và sửa từng câu trước khi lưu. Học sinh mở bài được giao sẽ làm bài tập
+để tự luyện (chấm ngay từng câu, chưa tính điểm nộp bài).
+
+Xuất/Nhập: bài HTML tải về là một file duy nhất có kèm JSON nguồn bên trong
+(nhúng trong thẻ script), mở được trong mọi trình duyệt và tải lên lại để
+tiếp tục làm việc; “Xuất JSON Môn” tải toàn bộ bài của một khối · môn ra một
+file JSON, “Nhập file bài học” nhận cả hai loại file. File HTML nhập vào chỉ
+hiển thị trong iframe sandbox, và file chứa script tải từ bên ngoài sẽ bị từ
+chối.
 
 Cấu hình (Vercel → project → Settings → Environment Variables, rồi deploy
 lại):
@@ -106,25 +129,28 @@ lại):
 
 Giới hạn của bản test: file đính kèm tối đa 3MB mỗi file và 3MB tổng cộng;
 một lần soạn tối đa 5 phút (giới hạn của Vercel Hobby); bài HTML chưa chấm
-điểm và chưa gửi lên Kho chung được; chưa có soạn hàng loạt theo chương trình
-và chưa có cài đặt khối/môn chọn sẵn trong hồ sơ giáo viên.
+điểm và chưa gửi lên Kho chung được; bài tập từ bài HTML chỉ để tự luyện,
+chưa tính vào điểm nộp bài.
 
 ## Cấu trúc code
 
 ```text
 api/
-  ai-soan-bai.ts      Vercel function: gọi Gemini, trích văn bản DOCX/TXT,
-                      kiểm tra hợp đồng output, trả về theo luồng SSE
+  ai-soan-bai.ts      Vercel function tự chứa toàn bộ: lắp prompt hai lớp,
+                      gọi Gemini (SSE cho soạn bài, JSON cho lên chương
+                      trình và tạo bài tập), trích văn bản DOCX/TXT,
+                      kiểm tra hợp đồng output; không import file nội bộ
 src/
   types.ts            Kiểu dữ liệu chung
   permissions.ts      Bảng quyền trung tâm + hàm xác định phạm vi
   answers.ts          Chấm đáp án (dùng chung cho quiz, game và dữ liệu mẫu)
   tutorEngine.ts      Gia sư demo trả lời theo gợi ý có sẵn, không dùng AI thật
   ai/
-    prompt.ts         Lắp prompt hai lớp (dùng chung client + function)
     subjects.ts       Danh sách môn theo khối + câu vai trò mặc định
-    apiTypes.ts       Kiểu dữ liệu gửi tới /api/ai-soan-bai
-    client.ts         Client gọi API AI (đọc luồng SSE)
+    apiTypes.ts       Kiểu dữ liệu gửi tới /api/ai-soan-bai (bản sao trong
+                      function phải giữ đồng bộ với file này)
+    client.ts         Client gọi API AI (đọc luồng SSE + gọi JSON)
+    lessonFile.ts     Xuất/nhập file bài học: HTML kèm JSON nguồn, JSON Môn
   data/
     questions.ts      Ngân hàng câu hỏi (được tạo ra, đáp án đã tính sẵn)
     seed.ts           Tài khoản, trường, lớp, bài học, bài giao, đề xuất mẫu

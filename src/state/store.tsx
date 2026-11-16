@@ -8,6 +8,7 @@ import type {
   Assignment,
   ChatMsg,
   ClassGroup,
+  ExerciseSet,
   GameDef,
   Lesson,
   Proposal,
@@ -45,6 +46,8 @@ export interface AppState {
   proposals: Proposal[];
   repoItems: RepoItem[];
   tutor: Record<string, TutorData>;
+  /** Practice exercise sets generated from lessons, keyed by set id. */
+  exerciseSets: ExerciseSet[];
   /** Personal Space renames, keyed by student id. */
   spaceNames: Record<string, string>;
   /** Admin school filter (null = all schools). */
@@ -66,6 +69,7 @@ export function buildInitialState(): AppState {
     proposals: clone(PROPOSALS),
     repoItems: clone(REPO_ITEMS),
     tutor: clone(TUTOR_DATA),
+    exerciseSets: [],
     spaceNames: {},
     schoolFilter: null,
   };
@@ -84,6 +88,9 @@ export type Action =
   | { type: 'CREATE_STUDENT'; account: Account; tutor: TutorData }
   | { type: 'CREATE_CLASS'; classGroup: ClassGroup }
   | { type: 'SET_TEACHING_PROFILE'; accountId: string; profile: TeachingProfile }
+  | { type: 'CREATE_EXERCISE_SET'; set: ExerciseSet }
+  | { type: 'UPDATE_EXERCISE_SET'; set: ExerciseSet }
+  | { type: 'DELETE_EXERCISE_SET'; setId: string }
   | { type: 'ADD_REVIEW_QUESTION'; studentId: string; questionId: string }
   | { type: 'MARK_MASTERED'; studentId: string; questionId: string }
   | { type: 'ADD_CHAT'; studentId: string; message: ChatMsg }
@@ -195,6 +202,15 @@ export function reducer(state: AppState, action: Action): AppState {
           a.id === action.accountId ? { ...a, teachingProfile: action.profile } : a,
         ),
       };
+    case 'CREATE_EXERCISE_SET':
+      return { ...state, exerciseSets: [...state.exerciseSets, action.set] };
+    case 'UPDATE_EXERCISE_SET':
+      return {
+        ...state,
+        exerciseSets: state.exerciseSets.map((s) => (s.id === action.set.id ? action.set : s)),
+      };
+    case 'DELETE_EXERCISE_SET':
+      return { ...state, exerciseSets: state.exerciseSets.filter((s) => s.id !== action.setId) };
     case 'ADD_REVIEW_QUESTION': {
       const t = state.tutor[action.studentId];
       if (!t || t.reviewQuestionIds.includes(action.questionId)) return state;

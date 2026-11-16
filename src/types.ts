@@ -148,6 +148,15 @@ export interface Lesson {
   /** Grade + subject the lesson was composed for (AI lessons). */
   grade?: number;
   subject?: string;
+  /** Topic label for grouping inside "Bài của tôi" (teacher-assigned;
+   * e.g. "Phân số" groups "Rút gọn phân số", "So sánh phân số", ...).
+   * When unset, grouping falls back to the first Pack topic, if any. */
+  topic?: string;
+  /** Generation inputs kept for the file round-trip: exporting the
+   * lesson embeds them as JSON so re-import restores them. */
+  outline?: string;
+  roleSentence?: string;
+  extraRequests?: string;
 }
 
 export interface Topic {
@@ -268,6 +277,49 @@ export interface TutorData {
   reviewQuestionIds: string[];
   masteredIds: string[];
   bestScores: Record<string, number>;
+}
+
+// ---------- Practice exercises (generated from a lesson) ----------
+
+export interface ExerciseQuestion {
+  id: string;
+  kind: 'choice' | 'short';
+  /** Question text, plain Vietnamese. */
+  prompt: string;
+  /** Choice questions: 3–4 options, exactly one correct. */
+  choices?: string[];
+  /** Choice questions: index into `choices`. */
+  answerIndex?: number;
+  /** Short-answer questions: the expected answer (compared loosely). */
+  expected?: string;
+  hint?: string;
+}
+
+export interface ExerciseSet {
+  id: string;
+  lessonId: string;
+  title: string;
+  createdBy: string;
+  questions: ExerciseQuestion[];
+  createdAt: string;
+}
+
+// ---------- Public marketplace ("Kho user nộp lên") ----------
+
+export interface MarketplaceItem {
+  id: string;
+  title: string;
+  description: string;
+  grade: number;
+  subject: string;
+  topic: string;
+  sellerName: string;
+  /** 0 = free. Demo prices in VND; no real payments in the demo. */
+  price: number;
+  /** True when the seller made it with AI assistance (labelled for buyers). */
+  aiAssisted: boolean;
+  /** The lesson content, previewed before taking a copy. */
+  lesson: Lesson;
 }
 
 // ---------- Views ----------

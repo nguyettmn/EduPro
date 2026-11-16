@@ -298,6 +298,16 @@ button.todo-row:hover { border-color: var(--role-color); }
 .check-grid .check-row { margin: 6px 0; }
 .inline-add { display: flex; gap: 10px; align-items: flex-end; }
 .inline-add .field { flex: 1; }
+.group-head { display: flex; gap: 6px; align-items: baseline; width: 100%; text-align: left; background: none; border: none; padding: 6px 4px; font: inherit; font-weight: 700; cursor: pointer; }
+.group-head-1 { font-size: 15.5px; }
+.group-head-2 { font-size: 14.5px; padding-left: 16px; }
+.group-head-3 { font-size: 14px; font-weight: 600; padding-left: 30px; }
+.group-lessons { padding-left: 30px; display: flex; flex-direction: column; gap: 8px; }
+.batch-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.batch-row { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; }
+.batch-row-discarded { opacity: 0.6; }
+.batch-row-discarded .batch-title { text-decoration: line-through; }
+.batch-title { flex: 1; font-weight: 600; }
 .repo-item { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 12px; }
 .repo-item-head {
   display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left;

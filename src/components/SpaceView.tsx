@@ -10,6 +10,7 @@ import { useStore } from '../state/store';
 import type { Route } from '../route';
 import { QuizRunner } from './QuizRunner';
 import { HtmlLessonPlayer } from './HtmlLessonPlayer';
+import { LessonExerciseSets } from './ExerciseRunner';
 import { dueLabel, EmptyState, SectionBand, formatDate } from './ui';
 
 const todayIso = (): string => new Date().toISOString().slice(0, 10);
@@ -58,6 +59,7 @@ export function SpaceView({
             không có nút nộp.
           </p>
           <HtmlLessonPlayer html={lesson.html} title={selected.title} />
+          <LessonExerciseSets lessonId={lesson.id} />
         </div>
       );
     }
