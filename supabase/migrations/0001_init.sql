@@ -17,24 +17,29 @@
 --   the standard-content library (Kho bài chuẩn / BGD branch) is built
 --   out beyond the single sample Pack.
 --
--- AUTH MODEL:
+-- AUTH MODEL (see also 0002_registration_approval.sql, which supersedes
+-- the signup part of this paragraph):
 --   Supabase Auth (email + password) is the identity. Every auth user
 --   gets exactly one `profiles` row (id = auth.users id), created by the
---   `handle_new_user` trigger from the signup/invite metadata
---   (name/role/school_id/team_id). Public self-signup must stay OFF in
---   the dashboard (Authentication -> Providers -> Email -> "Allow new
---   users" off): accounts are created by managers through the app's
---   invite function (a Vercel server function using the service-role
---   key), matching the product rule that teachers add students by email
---   and principals manage teacher accounts. Students invited by email
---   get a tutor_data row from the same trigger.
+--   `handle_new_user` trigger from the signup/invite metadata. Open
+--   registration is ON ("Allow new users" stays enabled): signup offers
+--   Principal / Teacher / Student; a registering principal names a new
+--   school and is active immediately, while a teacher/student who picks
+--   an existing school starts 'pending' until approved/placed (see
+--   0002). Teachers and students may also register with no school
+--   (independent teachers / learners, active immediately). The
+--   email-invite flow runs alongside: accounts created by managers
+--   through the app's invite function (a Vercel server function using
+--   the service-role key) skip approval, matching the product rule that
+--   teachers add students by email and principals manage teacher
+--   accounts. Students get a tutor_data row from the same trigger.
 --
 -- PERMISSION MODEL (mirrors src/permissions.ts):
 --   Principal > Team Lead > Teacher > Student. There is NO Admin role
 --   (user decision 2026-11-16): the "admin" is the person who edits the
---   source code, so system-wide concerns (adding schools, creating
---   principal accounts) are done directly in the database with the
---   service role, never through the app. A manager sees everything of
+--   source code. Principals self-register and create their own school
+--   (see 0002); other system-wide fixes are done directly in the
+--   database with the service role, never through the app. A manager sees everything of
 --   the accounts they manage EXCEPT a student's Tutor Space contents (tutor_data + standalone games): for those, managers
 --   only get the summary via the `get_tutor_summary` RPC. Nobody edits
 --   or deletes someone else's original: UPDATE/DELETE on lessons,

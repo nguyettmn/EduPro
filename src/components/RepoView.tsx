@@ -38,7 +38,7 @@ export function RepoView({ account }: { account: Account }) {
   const [rejectFor, setRejectFor] = useState<string | null>(null);
   const [reasonDrafts, setReasonDrafts] = useState<Record<string, string>>({});
   const [proposeCopyId, setProposeCopyId] = useState('');
-  const [proposeTarget, setProposeTarget] = useState<'team' | 'school'>('team');
+  const [proposeTarget, setProposeTarget] = useState<'team' | 'school'>(account.teamId ? 'team' : 'school');
   const [notice, setNotice] = useState<string | null>(null);
 
   const ownSchool = account.schoolId;
@@ -321,7 +321,7 @@ export function RepoView({ account }: { account: Account }) {
       {tab === 'mine' ? (
         <>
           {mine.length === 0 ? <EmptyState text="Bạn chưa gửi đề xuất nào." /> : mine.map(renderProposal)}
-          {canDo(account, 'propose') && !canDo(account, 'useTutor') ? (
+          {canDo(account, 'propose') && !canDo(account, 'useTutor') && account.schoolId !== null ? (
             <div className="form-card">
               <h3 className="subhead">Gửi đề xuất mới</h3>
               <p className="guide-text">
@@ -341,7 +341,7 @@ export function RepoView({ account }: { account: Account }) {
               <label className="field">
                 <span>Gửi lên</span>
                 <select value={proposeTarget} onChange={(e) => setProposeTarget(e.target.value as 'team' | 'school')}>
-                  <option value="team">Kho Tổ (Tổ trưởng duyệt)</option>
+                  {account.teamId ? <option value="team">Kho Tổ (Tổ trưởng duyệt)</option> : null}
                   <option value="school">Kho Trường (Hiệu trưởng duyệt)</option>
                 </select>
               </label>
@@ -351,7 +351,7 @@ export function RepoView({ account }: { account: Account }) {
                 disabled={proposeCopyId === ''}
                 onClick={() => {
                   const copy = myCopies.find((l) => l.id === proposeCopyId);
-                  if (!copy) return;
+                  if (!copy || !account.schoolId) return;
                   dispatch({
                     type: 'PROPOSE',
                     proposal: {
@@ -363,7 +363,7 @@ export function RepoView({ account }: { account: Account }) {
                       createdByName: account.name,
                       anonymous: false,
                       targetRepo: proposeTarget,
-                      schoolId: account.schoolId ?? 'S1',
+                      schoolId: account.schoolId,
                       teamId: account.teamId,
                       stage: proposeTarget,
                       status: 'pending',

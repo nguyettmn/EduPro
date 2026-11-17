@@ -1,6 +1,7 @@
 // Shared domain types for EduPro.
-// Demo state is in-memory (resets on reload). The only network call is
-// POST /api/ai-soan-bai, the server-side Gemini route for AI authoring.
+// State lives in Supabase (Postgres + Auth); the store loads it on
+// sign-in and writes through every change. AI authoring goes through
+// POST /api/ai-soan-bai, the server-side Gemini route.
 
 export type Role = 'principal' | 'lead' | 'teacher' | 'student';
 
@@ -22,9 +23,10 @@ export interface Account {
   id: string;
   name: string;
   role: Role;
-  /** Every account belongs to one school; null is unused by current
-   * roles (there is no Admin role: the system's owner edits the source
-   * code and the database directly). */
+  /** The school this account belongs to; null for independent teachers
+   * and school-less students, who have no manager above them. There is
+   * no Admin role: the system's owner edits the source code and the
+   * database directly. */
   schoolId: string | null;
   teamId: string | null;
   /** Teachers: classes they teach. Students: [own class]. */
@@ -38,6 +40,12 @@ export interface Account {
    * account teaches, picked in Hồ sơ. The AI authoring flow only offers
    * these grades/subjects when a profile is set. */
   teachingProfile?: TeachingProfile;
+  /** Approval status (migration 0002). A school teacher/student who
+   * registered and picked a school is 'pending' until the principal
+   * approves (or a placement activates the student). Pending accounts
+   * still use their private workspace; school-scoped things stay hidden
+   * until approval. Independent accounts and principals are 'active'. */
+  status?: 'pending' | 'active';
 }
 
 /** Grades + subjects a teacher pre-selects in profile settings.
@@ -61,11 +69,14 @@ export interface Team {
 
 export interface ClassGroup {
   id: string;
-  schoolId: string;
-  teamId: string;
+  /** Null = the teacher's own outside class: invisible to any school. */
+  schoolId: string | null;
+  /** Null for outside classes and for classes not assigned to a team. */
+  teamId: string | null;
   name: string;
   grade: number;
-  teacherId: string;
+  /** Null for seed classes that no teacher owns yet. */
+  teacherId: string | null;
 }
 
 // ---------- Maths content ----------
@@ -330,6 +341,10 @@ export interface TutorData {
   reviewQuestionIds: string[];
   masteredIds: string[];
   bestScores: Record<string, number>;
+  /** Client-only summary field, filled from the get_tutor_summary RPC
+   * for students the viewer manages: how many standalone games the
+   * student made. Never written to the database (it is not a column). */
+  standaloneGameCount?: number;
 }
 
 // ---------- Practice exercises (generated from a lesson) ----------

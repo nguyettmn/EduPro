@@ -43,14 +43,31 @@ export function LessonGamesSection({
   const canCreate = isTutorContext ? isStudent : canDo(account, 'createContent');
   const canUpload = isTutorContext ? isStudent : canDo(account, 'createContent');
 
+  // Games attach to database lessons. A Pack original is not a database
+  // row, so the first game action on one copies it into "Bài của tôi"
+  // and attaches the game to the copy instead.
+  const ensureOwnedLesson = (): Lesson => {
+    if (isTutorContext || lesson!.ownerId) return lesson!;
+    const copy: Lesson = {
+      ...JSON.parse(JSON.stringify(lesson!)) as Lesson,
+      id: `LC-${Date.now()}`,
+      title: `${lesson!.title} (bản của ${account.name})`,
+      ownerId: account.id,
+      sourceId: lesson!.id,
+    };
+    dispatch({ type: 'COPY_TO_MY_SPACE', lesson: copy });
+    return copy;
+  };
+
   const openStudio = (gameId?: string) => {
     if (isTutorContext) {
       go({ view: 'gamestudio', from: 'tutor', studentId: account.id, ...(gameId ? { gameId } : {}) });
     } else {
+      const target = gameId ? lesson! : ensureOwnedLesson();
       go({
         view: 'gamestudio',
         from: from ?? 'lesson',
-        lessonId: lesson!.id,
+        lessonId: target.id,
         ...(assignmentId ? { assignmentId } : {}),
         ...(gameId ? { gameId } : {}),
       });
@@ -73,7 +90,7 @@ export function LessonGamesSection({
       theme: game.theme,
       htmlCode: game.htmlCode,
       ownerId: account.id,
-      ...(lesson ? { lessonId: lesson.id } : {}),
+      ...(lesson ? { lessonId: ensureOwnedLesson().id } : {}),
       createdAt: new Date().toISOString().slice(0, 10),
       needsInternet: game.needsInternet || undefined,
     };

@@ -1337,6 +1337,26 @@ function sendOk(res: NodeRes, payload: unknown): void {
   res.end(JSON.stringify(payload));
 }
 
+/** Verify the caller's Supabase JWT before spending any Gemini quota.
+ * The function has no database access: it asks Supabase Auth whether the
+ * token is valid (GET /auth/v1/user with the anon key + Bearer token). */
+async function verifyCaller(req: NodeReq): Promise<boolean> {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+  const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+  const header = req.headers.authorization;
+  const token =
+    typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!url || !anonKey || !token) return false;
+  try {
+    const res = await fetch(`${url}/auth/v1/user`, {
+      headers: { apikey: anonKey, Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Read the request body. Vercel's Node runtime may pre-parse JSON into
  * req.body; otherwise the raw stream is still readable. Both paths are
  * handled so this works either way. */
@@ -1464,6 +1484,16 @@ async function handleJsonStage(
 export default async function handler(req: NodeReq, res: NodeRes): Promise<void> {
   if (req.method !== 'POST') {
     sendJson(res, 405, 'method_not_allowed', 'Chỉ hỗ trợ POST.');
+    return;
+  }
+
+  if (!(await verifyCaller(req))) {
+    sendJson(
+      res,
+      401,
+      'unauthorized',
+      'Bạn cần đăng nhập để dùng AI. Hãy tải lại trang và đăng nhập lại.',
+    );
     return;
   }
 

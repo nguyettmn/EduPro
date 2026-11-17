@@ -55,6 +55,22 @@ export function KhoBaiChuanView({
     go({ view: 'studio', lessonId: copy.id });
   };
 
+  // Assign from Kho bài chuẩn: the assignment references the teacher's
+  // own copy, never the Pack original (Pack lessons are not database
+  // rows, so an assignment pointing at one would violate the foreign
+  // key). The persist queue writes the copy before the assignment.
+  const assignFromKho = (source: Lesson) => {
+    const copy = {
+      ...JSON.parse(JSON.stringify(source)) as Lesson,
+      id: `LC-${Date.now()}`,
+      title: `${source.title} (bản của ${account.name})`,
+      ownerId: account.id,
+      sourceId: source.id,
+    };
+    dispatch({ type: 'COPY_TO_MY_SPACE', lesson: copy });
+    setAssignLessonId(copy.id);
+  };
+
   return (
     <div>
       <SectionBand
@@ -252,7 +268,7 @@ export function KhoBaiChuanView({
                             <button
                               type="button"
                               className="btn btn-small btn-primary"
-                              onClick={() => setAssignLessonId(l.id)}
+                              onClick={() => assignFromKho(l)}
                             >
                               Giao bài
                             </button>

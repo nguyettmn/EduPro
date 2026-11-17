@@ -255,7 +255,7 @@ function CreateClassForm({
     if (!open) setGrade(defaultGrade);
   }, [defaultGrade, open]);
 
-  if (!canDo(account, 'createClass') || !account.schoolId || !account.teamId) return null;
+  if (!canDo(account, 'createClass')) return null;
 
   if (!open) {
     return (
@@ -271,6 +271,13 @@ function CreateClassForm({
   return (
     <div className="form-card">
       <h3 className="subhead">Tạo lớp mới</h3>
+      {account.status === 'pending' || !account.schoolId ? (
+        <p className="guide-text">
+          {account.schoolId
+            ? 'Tài khoản đang chờ duyệt nên lớp này là lớp riêng của bạn, trường chưa thấy.'
+            : 'Bạn dạy độc lập nên lớp này là lớp riêng của bạn, không thuộc trường nào.'}
+        </p>
+      ) : null}
       <div className="field-row">
         <label className="field">
           <span>Tên lớp</span>
@@ -296,19 +303,23 @@ function CreateClassForm({
           onClick={() => {
             const cleanName = name.trim();
             const duplicate = state.classes.some(
-              (c) => c.schoolId === account.schoolId && c.name.toLowerCase() === cleanName.toLowerCase(),
+              (c) => c.teacherId === account.id && c.name.toLowerCase() === cleanName.toLowerCase(),
             );
             if (duplicate) {
-              setError('Trường này đã có một lớp tên như vậy rồi.');
+              setError('Bạn đã có một lớp tên như vậy rồi.');
               return;
             }
+            // A class belongs to the school only when the teacher is an
+            // active member of that school; otherwise it is the teacher's
+            // own outside class (invisible to any school).
+            const inSchool = account.status !== 'pending' && account.schoolId !== null;
             const id = `C-${Date.now()}`;
             dispatch({
               type: 'CREATE_CLASS',
               classGroup: {
                 id,
-                schoolId: account.schoolId ?? '',
-                teamId: account.teamId ?? '',
+                schoolId: inSchool ? account.schoolId : null,
+                teamId: inSchool ? account.teamId : null,
                 name: cleanName,
                 grade,
                 teacherId: account.id,

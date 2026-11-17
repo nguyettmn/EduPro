@@ -1,7 +1,9 @@
 // Browser client for POST /api/ai-soan-bai: SSE stream for lesson
 // stages (propose/generate/revise), one plain JSON response for the
-// plan/exercises stages.
+// plan/exercises stages. Every call carries the signed-in user's JWT;
+// the function verifies it against Supabase Auth before calling Gemini.
 import type { AiRequestBody } from './apiTypes';
+import { getAccessToken } from '../supabase/client';
 
 export class AiApiError extends Error {
   code: string;
@@ -9,6 +11,11 @@ export class AiApiError extends Error {
     super(message);
     this.code = code;
   }
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 /** Call a JSON stage (plan / exercises) and return its `data` payload. */
@@ -20,7 +27,7 @@ export async function callAiJson<T>(
   try {
     res = await fetch('/api/ai-soan-bai', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify(body),
       signal: opts.signal,
     });
@@ -75,7 +82,7 @@ export async function callAiSoanBai(
   try {
     res = await fetch('/api/ai-soan-bai', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify(body),
       signal: opts.signal,
     });

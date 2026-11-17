@@ -1,8 +1,20 @@
-// In-memory demo store: React context + reducer.
-// No backend: everything resets when the page reloads, and "reset demo"
-// restores the seed data exactly.
-import { createContext, useContext, useMemo, useReducer } from 'react';
+// Store: React context + reducer, backed by Supabase.
+// The state loads from the database on sign-in (row-level security scopes
+// every table to what the user may see) and every change writes through
+// to Supabase via a FIFO persist queue, in dispatch order. The Pack
+// lessons stay static in the app code and are merged in on every load.
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import type { ReactNode } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import type {
   Account,
   Assignment,
@@ -15,32 +27,26 @@ import type {
   Lesson,
   Proposal,
   RepoItem,
+  School,
   StudentAnswer,
   Submission,
   TeachingProfile,
+  Team,
   TutorData,
 } from '../types';
-import {
-  ACCOUNTS,
-  ASSIGNMENTS,
-  CLASSES,
-  HTML_GAMES,
-  LESSON_COPIES,
-  PACK,
-  PACK_LESSONS,
-  PROPOSALS,
-  REPO_ITEMS,
-  SCHOOLS,
-  SUBMISSIONS,
-  TEAMS,
-  TUTOR_DATA,
-} from '../data/seed';
+import { PACK, PACK_LESSONS, SCHOOLS, TEAMS } from '../data/seed';
 import { QUESTIONS } from '../data/questions';
 import { topicResults, topicResultsFromGameSkills, updateWeakTopics } from '../answers';
+import { INITIAL_HASH, clearAuthHash, supabase } from '../supabase/client';
+import { loadAppState } from '../supabase/load';
+import { persistAction } from '../supabase/persist';
 
 export interface AppState {
   currentAccountId: string | null;
   accounts: Account[];
+  /** Schools and teams, loaded from the database (static seed as fallback). */
+  schools: School[];
+  teams: Team[];
   /** Classes are mutable state: teachers can create new ones. */
   classes: ClassGroup[];
   lessons: Lesson[];
@@ -67,23 +73,25 @@ function clone<T>(value: T): T {
 export function buildInitialState(): AppState {
   return {
     currentAccountId: null,
-    accounts: clone(ACCOUNTS),
-    classes: clone(CLASSES),
-    lessons: clone([...PACK_LESSONS, ...LESSON_COPIES]),
-    assignments: clone(ASSIGNMENTS),
-    submissions: clone(SUBMISSIONS),
-    proposals: clone(PROPOSALS),
-    repoItems: clone(REPO_ITEMS),
-    tutor: clone(TUTOR_DATA),
+    accounts: [],
+    schools: clone(SCHOOLS),
+    teams: clone(TEAMS),
+    classes: [],
+    lessons: clone(PACK_LESSONS),
+    assignments: [],
+    submissions: [],
+    proposals: [],
+    repoItems: [],
+    tutor: {},
     exerciseSets: [],
-    htmlGames: clone(HTML_GAMES),
+    htmlGames: [],
     gameResults: [],
     spaceNames: {},
   };
 }
 
 export type Action =
-  | { type: 'SWITCH_ACCOUNT'; accountId: string }
+  | { type: 'LOAD_STATE'; state: AppState }
   | { type: 'LOGOUT' }
   | { type: 'SUBMIT_WORK'; submission: Submission }
   | { type: 'ADD_COMMENT'; submissionId: string; comment: string }
@@ -92,7 +100,6 @@ export type Action =
   | { type: 'REVIEW_PROPOSAL'; proposalId: string; decision: 'approved' | 'rejected'; reason: string; decidedBy: string; repoItem?: RepoItem; nextStage?: Proposal['stage'] }
   | { type: 'CREATE_ASSIGNMENT'; assignment: Assignment }
   | { type: 'COPY_TO_MY_SPACE'; lesson: Lesson }
-  | { type: 'CREATE_STUDENT'; account: Account; tutor: TutorData }
   | { type: 'CREATE_CLASS'; classGroup: ClassGroup }
   | { type: 'SET_TEACHING_PROFILE'; accountId: string; profile: TeachingProfile }
   | { type: 'CREATE_EXERCISE_SET'; set: ExerciseSet }
@@ -110,13 +117,12 @@ export type Action =
   | { type: 'UPDATE_LESSON_COPY'; lesson: Lesson }
   | { type: 'CREATE_LESSON_COPY'; lesson: Lesson }
   | { type: 'DELETE_LESSON_COPY'; lessonId: string }
-  | { type: 'RENAME_SPACE'; studentId: string; name: string }
-  | { type: 'RESET_DEMO' };
+  | { type: 'RENAME_SPACE'; studentId: string; name: string };
 
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    case 'SWITCH_ACCOUNT':
-      return { ...state, currentAccountId: action.accountId };
+    case 'LOAD_STATE':
+      return action.state;
     case 'LOGOUT':
       return { ...state, currentAccountId: null };
     case 'SUBMIT_WORK': {
@@ -185,12 +191,6 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, assignments: [...state.assignments, action.assignment] };
     case 'COPY_TO_MY_SPACE':
       return { ...state, lessons: [...state.lessons, action.lesson] };
-    case 'CREATE_STUDENT':
-      return {
-        ...state,
-        accounts: [...state.accounts, action.account],
-        tutor: { ...state.tutor, [action.account.id]: action.tutor },
-      };
     case 'CREATE_CLASS': {
       // The new class must also join the teacher's class list: teacher
       // visibility (visibleClasses) is driven by account.classIds.
@@ -199,7 +199,7 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         classes: [...state.classes, action.classGroup],
         accounts: state.accounts.map((a) =>
-          a.id === teacherId && !a.classIds.includes(action.classGroup.id)
+          teacherId !== null && a.id === teacherId && !a.classIds.includes(action.classGroup.id)
             ? { ...a, classIds: [...a.classIds, action.classGroup.id] }
             : a,
         ),
@@ -322,34 +322,195 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'CREATE_LESSON_COPY':
       return { ...state, lessons: [...state.lessons, action.lesson] };
     case 'DELETE_LESSON_COPY':
-      return { ...state, lessons: state.lessons.filter((l) => l.id !== action.lessonId) };
+      // The database cascades the delete to the lesson's games and
+      // exercise sets; mirror that here so no stale rows linger in state.
+      return {
+        ...state,
+        lessons: state.lessons.filter((l) => l.id !== action.lessonId),
+        htmlGames: state.htmlGames.filter((g) => g.lessonId !== action.lessonId),
+        exerciseSets: state.exerciseSets.filter((s) => s.lessonId !== action.lessonId),
+      };
     case 'RENAME_SPACE':
       return {
         ...state,
         spaceNames: { ...state.spaceNames, [action.studentId]: action.name.trim() },
       };
-    case 'RESET_DEMO':
-      return { ...buildInitialState(), currentAccountId: state.currentAccountId };
     default:
       return state;
   }
+}
+
+export type AuthStatus = 'loading' | 'signed-in' | 'signed-out' | 'no-config';
+
+export interface AuthContextValue {
+  status: AuthStatus;
+  session: Session | null;
+  /** True when the user arrived via an invite/recovery link and must set
+   * a password before using the app. */
+  needsPassword: boolean;
+  /** Last load failure, if the state could not be read from Supabase. */
+  loadError: string | null;
+  /** Last persist failure, if a change could not be written. */
+  syncError: string | null;
+  refreshing: boolean;
+  refresh: () => void;
+  signOut: () => void;
+  clearNeedsPassword: () => void;
+  clearSyncError: () => void;
 }
 
 interface StoreContextValue {
   state: AppState;
   dispatch: React.Dispatch<Action>;
   currentAccount: Account | null;
+  auth: AuthContextValue;
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null);
 
+/** Invite and recovery links carry their type in the URL hash. */
+function cameFromInviteOrRecovery(): boolean {
+  return INITIAL_HASH.includes('type=invite') || INITIAL_HASH.includes('type=recovery');
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, buildInitialState);
+  const [state, baseDispatch] = useReducer(reducer, undefined, buildInitialState);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(supabase ? 'loading' : 'no-config');
+  const [session, setSession] = useState<Session | null>(null);
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  // Persist queue: one promise chain, so writes land in dispatch order.
+  const queueRef = useRef(Promise.resolve());
+  const loadingForRef = useRef<string | null>(null);
+
+  const loadIntoStore = useCallback(async (userId: string) => {
+    if (!supabase || loadingForRef.current === userId) return;
+    loadingForRef.current = userId;
+    setRefreshing(true);
+    setLoadError(null);
+    try {
+      const loaded = await loadAppState(supabase, userId);
+      baseDispatch({ type: 'LOAD_STATE', state: loaded });
+      setAuthStatus('signed-in');
+    } catch (err) {
+      setLoadError(
+        err instanceof Error ? err.message : 'Không tải được dữ liệu. Hãy thử lại.',
+      );
+      setAuthStatus('signed-in');
+    } finally {
+      loadingForRef.current = null;
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const client = supabase;
+    let cancelled = false;
+    void client.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (data.session) {
+        setSession(data.session);
+        if (cameFromInviteOrRecovery()) setNeedsPassword(true);
+        void loadIntoStore(data.session.user.id);
+      } else {
+        setAuthStatus('signed-out');
+      }
+    });
+    const { data: listener } = client.auth.onAuthStateChange((event, nextSession) => {
+      if (cancelled) return;
+      if (event === 'SIGNED_IN' && nextSession) {
+        setSession(nextSession);
+        if (cameFromInviteOrRecovery()) setNeedsPassword(true);
+        void loadIntoStore(nextSession.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setNeedsPassword(false);
+        setLoadError(null);
+        baseDispatch({ type: 'LOAD_STATE', state: buildInitialState() });
+        setAuthStatus('signed-out');
+      } else if (event === 'PASSWORD_RECOVERY') {
+        setNeedsPassword(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
+  }, [loadIntoStore]);
+
+  const dispatch = useCallback((action: Action) => {
+    const prev = stateRef.current;
+    baseDispatch(action);
+    const next = reducer(prev, action);
+    stateRef.current = next;
+    if (!supabase || action.type === 'LOAD_STATE' || action.type === 'LOGOUT') return;
+    const client = supabase;
+    queueRef.current = queueRef.current
+      .then(() => persistAction(client, action, next))
+      .catch((err: unknown) => {
+        setSyncError(err instanceof Error ? err.message : 'Không lưu được thay đổi.');
+      });
+  }, []);
+
+  const refresh = useCallback(() => {
+    if (!session) return;
+    setSyncError(null);
+    void loadIntoStore(session.user.id);
+  }, [session, loadIntoStore]);
+
+  const signOut = useCallback(() => {
+    if (!supabase) return;
+    void supabase.auth.signOut();
+  }, []);
+
+  const clearNeedsPassword = useCallback(() => {
+    setNeedsPassword(false);
+    clearAuthHash();
+  }, []);
+
+  const clearSyncError = useCallback(() => setSyncError(null), []);
+
   const value = useMemo<StoreContextValue>(() => {
     const currentAccount =
       state.accounts.find((a) => a.id === state.currentAccountId) ?? null;
-    return { state, dispatch, currentAccount };
-  }, [state]);
+    return {
+      state,
+      dispatch,
+      currentAccount,
+      auth: {
+        status: authStatus,
+        session,
+        needsPassword,
+        loadError,
+        syncError,
+        refreshing,
+        refresh,
+        signOut,
+        clearNeedsPassword,
+        clearSyncError,
+      },
+    };
+  }, [
+    state,
+    dispatch,
+    authStatus,
+    session,
+    needsPassword,
+    loadError,
+    syncError,
+    refreshing,
+    refresh,
+    signOut,
+    clearNeedsPassword,
+    clearSyncError,
+  ]);
+
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 
@@ -359,8 +520,8 @@ export function useStore(): StoreContextValue {
   return ctx;
 }
 
-// Static reference data (not part of the mutable demo state). Classes are
-// NOT here: they live in AppState because teachers can create new ones.
-export const REFERENCE = { SCHOOLS, TEAMS, PACK };
+// Static reference data: the Pack only. Schools, teams and classes live
+// in AppState because they come from the database.
+export const REFERENCE = { PACK };
 
 export type { StudentAnswer };

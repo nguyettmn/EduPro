@@ -91,10 +91,12 @@ export function canDo(account: Account, action: Action): boolean {
 export function managedAccounts(viewer: Account, accounts: Account[]): Account[] {
   switch (viewer.role) {
     case 'principal':
+      if (viewer.schoolId === null) return [];
       return accounts.filter(
         (a) => a.id !== viewer.id && a.schoolId === viewer.schoolId,
       );
     case 'lead':
+      if (viewer.schoolId === null || viewer.teamId === null) return [];
       return accounts.filter((a) => {
         if (a.id === viewer.id || a.schoolId !== viewer.schoolId) return false;
         if (a.role === 'teacher' || a.role === 'lead') return a.teamId === viewer.teamId;
@@ -134,9 +136,11 @@ export function visibleClasses(
 ): ClassGroup[] {
   switch (viewer.role) {
     case 'principal':
-      return classes.filter((c) => c.schoolId === viewer.schoolId);
+      if (viewer.schoolId === null) return [];
+      return classes.filter((c) => c.schoolId !== null && c.schoolId === viewer.schoolId);
     case 'lead':
-      return classes.filter((c) => c.teamId === viewer.teamId);
+      if (viewer.teamId === null) return [];
+      return classes.filter((c) => c.teamId !== null && c.teamId === viewer.teamId);
     case 'teacher':
     case 'student':
       return classes.filter((c) => viewer.classIds.includes(c.id));

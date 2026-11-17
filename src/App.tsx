@@ -1,10 +1,11 @@
-// App composition: mock-login gate, shell, and state-based view routing.
-// Every route passes through the permission table before rendering.
+// App composition: Supabase auth gate, shell, and state-based view
+// routing. Every route passes through the permission table before
+// rendering.
 import { useState } from 'react';
 import { StoreProvider, useStore } from './state/store';
 import { canDo, canView, canViewTutorSummary, getNavItems, spaceNameFor } from './permissions';
 import type { Route } from './route';
-import { AccountPicker } from './components/AccountPicker';
+import { AuthView, SetPasswordView } from './components/AuthView';
 import { Shell } from './components/Shell';
 import { Dashboard } from './components/Dashboard';
 import { ClassView } from './components/ClassView';
@@ -19,20 +20,69 @@ import { GameStudio } from './components/GameStudio';
 import { ManageViews, SettingsView } from './components/ManageViews';
 import { EmptyState } from './components/ui';
 
+function SetupCard() {
+  return (
+    <div className="picker-page">
+      <div className="picker-card">
+        <div className="picker-logo">EduPro</div>
+        <h1 className="picker-title">Chưa nối được với Supabase</h1>
+        <p className="picker-guide">
+          App chưa thấy địa chỉ và key của project Supabase. Hãy thêm hai biến môi trường
+          VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY vào Vercel rồi Redeploy, sau đó tải lại trang này.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function LoadingCard({ text }: { text: string }) {
+  return (
+    <div className="picker-page">
+      <div className="picker-card">
+        <div className="picker-logo">EduPro</div>
+        <p className="picker-guide">{text}</p>
+      </div>
+    </div>
+  );
+}
+
 function AppInner() {
-  const { state, dispatch, currentAccount } = useStore();
+  const { state, currentAccount, auth } = useStore();
   const [route, setRoute] = useState<Route>({ view: 'dashboard' });
 
+  if (auth.status === 'no-config') {
+    return <SetupCard />;
+  }
+  if (auth.status === 'loading') {
+    return <LoadingCard text="Đang tải dữ liệu…" />;
+  }
+  if (!auth.session) {
+    return <AuthView />;
+  }
+  if (auth.needsPassword) {
+    return <SetPasswordView onDone={auth.clearNeedsPassword} />;
+  }
   if (!currentAccount) {
-    return (
-      <AccountPicker
-        accounts={state.accounts}
-        onPick={(accountId) => {
-          dispatch({ type: 'SWITCH_ACCOUNT', accountId });
-          setRoute({ view: 'dashboard' });
-        }}
-      />
-    );
+    if (auth.loadError) {
+      return (
+        <div className="picker-page">
+          <div className="picker-card">
+            <div className="picker-logo">EduPro</div>
+            <h1 className="picker-title">Không tải được hồ sơ của bạn</h1>
+            <p className="picker-guide">{auth.loadError}</p>
+            <div className="row-actions">
+              <button type="button" className="btn btn-primary" onClick={auth.refresh}>
+                Thử lại
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={auth.signOut}>
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return <LoadingCard text="Đang tải hồ sơ của bạn…" />;
   }
 
   const go = (next: Route) => setRoute(next);
@@ -59,16 +109,29 @@ function AppInner() {
   return (
     <Shell
       account={currentAccount}
-      accounts={state.accounts}
       navItems={getNavItems(currentAccount, spaceName)}
       activeView={activeView}
       onNavigate={(view) => setRoute({ view })}
-      onSwitchAccount={(accountId) => {
-        dispatch({ type: 'SWITCH_ACCOUNT', accountId });
-        setRoute({ view: 'dashboard' });
-      }}
-      onLogout={() => dispatch({ type: 'LOGOUT' })}
+      onLogout={auth.signOut}
     >
+      {currentAccount.status === 'pending' ? (
+        <p className="notice">
+          {currentAccount.role === 'student'
+            ? 'Tài khoản của em đang chờ được xếp vào lớp. Trong lúc chờ, em vẫn dùng được Tutor Space.'
+            : 'Tài khoản của bạn đang chờ hiệu trưởng duyệt. Trong lúc chờ, bạn vẫn soạn bài, tạo game và dạy lớp riêng bình thường — nội dung của trường sẽ hiện ra sau khi được duyệt.'}
+        </p>
+      ) : null}
+      {auth.syncError ? (
+        <p className="notice">
+          Có thay đổi chưa lưu được: {auth.syncError}{' '}
+          <button type="button" className="btn btn-small btn-secondary" onClick={auth.refresh}>
+            Tải lại dữ liệu
+          </button>{' '}
+          <button type="button" className="btn btn-small btn-ghost" onClick={auth.clearSyncError}>
+            Bỏ qua
+          </button>
+        </p>
+      ) : null}
       {!allowed ? (
         <EmptyState text="Bạn không có quyền xem trang này với vai trò hiện tại." />
       ) : route.view === 'dashboard' ? (

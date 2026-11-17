@@ -58,16 +58,14 @@ function TutorSummary({
         Nội dung chat, câu hỏi và game tự tạo của học sinh không hiện ở đây. Chỉ khi học sinh đề xuất một món lên
         Kho chung thì món đó mới được người duyệt xem.
       </div>
+      {/* The manager summary shows exactly what the get_tutor_summary
+          RPC returns: sessions, weak topics, and the standalone game
+          count. Review/mastered counts stay private to the student. */}
       <div className="stat-grid">
         <StatCard label="Số buổi luyện" value={String(tutor?.sessions ?? 0)} color="#be185d" />
-        <StatCard label="Câu cần ôn lại" value={String(tutor?.reviewQuestionIds.length ?? 0)} color="#be185d" />
-        <StatCard label="Câu đã thuộc" value={String(tutor?.masteredIds.length ?? 0)} color="#be185d" />
         <StatCard
           label="Game tự tạo"
-          value={String(
-            (tutor?.selfGames.length ?? 0) +
-              state.htmlGames.filter((g) => g.ownerId === student.id && !g.lessonId).length,
-          )}
+          value={String(tutor?.standaloneGameCount ?? 0)}
           color="#be185d"
         />
       </div>
@@ -178,6 +176,8 @@ export function TutorSpace({
   };
 
   const proposeGame = (game: GameDef) => {
+    // No school, no shared repository: the proposal has nowhere to go.
+    if (!student.schoolId) return;
     dispatch({
       type: 'PROPOSE',
       proposal: {
@@ -189,7 +189,7 @@ export function TutorSpace({
         createdByName: student.name,
         anonymous: proposeAnonymous,
         targetRepo: proposeTarget,
-        schoolId: student.schoolId ?? 'S1',
+        schoolId: student.schoolId,
         teamId: state.classes.find((c) => student.classIds.includes(c.id))?.teamId ?? null,
         stage: 'teacher',
         status: 'pending',
@@ -374,13 +374,15 @@ export function TutorSpace({
                   >
                     {playingGameId === game.id ? 'Đóng game' : 'Chơi'}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setProposeGameId(proposeGameId === game.id ? null : game.id)}
-                  >
-                    Đề xuất lên Kho chung
-                  </button>
+                  {student.schoolId ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setProposeGameId(proposeGameId === game.id ? null : game.id)}
+                    >
+                      Đề xuất lên Kho chung
+                    </button>
+                  ) : null}
                 </div>
                 {playingGameId === game.id ? (
                   <GameView
@@ -400,7 +402,9 @@ export function TutorSpace({
                         value={proposeTarget}
                         onChange={(e) => setProposeTarget(e.target.value as 'team' | 'school')}
                       >
-                        <option value="team">Kho Tổ</option>
+                        {state.classes.find((c) => student.classIds.includes(c.id))?.teamId ? (
+                          <option value="team">Kho Tổ</option>
+                        ) : null}
                         <option value="school">Kho Trường</option>
                       </select>
                     </label>

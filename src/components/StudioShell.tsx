@@ -426,7 +426,7 @@ export function StudioShell({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Lesson | null>(null);
   const [saved, setSaved] = useState(false);
-  const [proposeTarget, setProposeTarget] = useState<'team' | 'school'>('team');
+  const [proposeTarget, setProposeTarget] = useState<'team' | 'school'>(account.teamId ? 'team' : 'school');
   const [assignLessonId, setAssignLessonId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
@@ -624,7 +624,8 @@ export function StudioShell({
   };
 
   const propose = () => {
-    if (!draft) return;
+    // No school, no shared repository: the proposal has nowhere to go.
+    if (!draft || !account.schoolId) return;
     dispatch({
       type: 'PROPOSE',
       proposal: {
@@ -636,7 +637,7 @@ export function StudioShell({
         createdByName: account.name,
         anonymous: false,
         targetRepo: proposeTarget,
-        schoolId: account.schoolId ?? 'S1',
+        schoolId: account.schoolId,
         teamId: account.teamId,
         stage: proposeTarget,
         status: 'pending',
@@ -969,19 +970,21 @@ export function StudioShell({
                   </button>
                   {saved ? <span className="feedback-ok">Đã lưu.</span> : null}
                 </div>
-                <div className="form-card">
-                  <h3 className="subhead">Gửi lên Kho chung</h3>
-                  <label className="field">
-                    <span>Gửi lên</span>
-                    <select value={proposeTarget} onChange={(e) => setProposeTarget(e.target.value as 'team' | 'school')}>
-                      <option value="team">Kho Tổ (Tổ trưởng duyệt)</option>
-                      <option value="school">Kho Trường (Hiệu trưởng duyệt)</option>
-                    </select>
-                  </label>
-                  <button type="button" className="btn btn-primary" onClick={propose}>
-                    Gửi đề xuất
-                  </button>
-                </div>
+                {account.schoolId ? (
+                  <div className="form-card">
+                    <h3 className="subhead">Gửi lên Kho chung</h3>
+                    <label className="field">
+                      <span>Gửi lên</span>
+                      <select value={proposeTarget} onChange={(e) => setProposeTarget(e.target.value as 'team' | 'school')}>
+                        {account.teamId ? <option value="team">Kho Tổ (Tổ trưởng duyệt)</option> : null}
+                        <option value="school">Kho Trường (Hiệu trưởng duyệt)</option>
+                      </select>
+                    </label>
+                    <button type="button" className="btn btn-primary" onClick={propose}>
+                      Gửi đề xuất
+                    </button>
+                  </div>
+                ) : null}
                 <div className="row-actions">
                   <button
                     type="button"
